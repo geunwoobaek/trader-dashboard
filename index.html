@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Trading Bot</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0d1117;color:#c9d1d9;line-height:1.5;min-height:100vh}
+.container{max-width:1400px;margin:0 auto;padding:16px}
+.header{display:flex;justify-content:space-between;align-items:center;padding:16px 0;border-bottom:1px solid #21262d;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+.header h1{font-size:1.4em;color:#f0f6fc}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:12px;font-size:0.75em;font-weight:600}
+.badge-green{background:#1a3a1a;color:#3fb950;border:1px solid #238636}
+.badge-red{background:#3a1a1a;color:#f85149;border:1px solid #da3633}
+.badge-yellow{background:#3a351a;color:#d29922;border:1px solid #9e6a03}
+.badge-gray{background:#1a1d21;color:#8b949e;border:1px solid #30363d}
+.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;margin-bottom:16px}
+.card h2{font-size:0.85em;color:#8b949e;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-bottom:20px}
+.stat-value{font-size:1.5em;font-weight:700;color:#f0f6fc}
+.stat-sub{font-size:0.82em;color:#8b949e;margin-top:2px}
+.stat-row{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:0.82em}
+.stat-row span{color:#f0f6fc;font-weight:600}
+.macro-item{display:inline-flex;align-items:center;gap:6px;background:#0d1117;padding:6px 10px;border-radius:6px;border:1px solid #21262d;font-size:0.82em;margin-right:6px;margin-bottom:4px}
+.chip-active{display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:600;margin:2px;background:#1a3a1a;color:#3fb950;border:1px solid #238636}
+.chip-inactive{display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.75em;font-weight:600;margin:2px;background:#1a1d21;color:#484f58;border:1px solid #21262d}
+.signals-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-bottom:20px}
+.signal-card:hover{border-color:#58a6ff}
+.details{font-size:0.82em;color:#8b949e}
+.details .row{display:flex;justify-content:space-between;padding:2px 0}
+.details .lab{color:#8b949e}
+.guide-row{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #21262d}
+.guide-row:last-of-type{border-bottom:none}
+.guide-icon{flex-shrink:0;width:48px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:6px;font-size:0.72em;font-weight:700;letter-spacing:0.5px}
+.guide-buy .guide-icon{background:#1a3a1a;color:#3fb950;border:1px solid #238636}
+.guide-hold .guide-icon{background:#1a2a3a;color:#58a6ff;border:1px solid #1f6feb}
+.guide-sell .guide-icon{background:#3a1a1a;color:#f85149;border:1px solid #da3633}
+.guide-wait .guide-icon{background:#1a1d21;color:#8b949e;border:1px solid #30363d}
+.guide-title{font-weight:600;color:#f0f6fc;font-size:0.9em}
+.guide-desc{font-size:0.82em;color:#c9d1d9;margin-top:2px}
+.guide-explain{font-size:0.75em;color:#8b949e;margin-top:4px;font-style:italic}
+.footer{text-align:center;padding:20px 0;color:#484f58;font-size:0.78em;border-top:1px solid #21262d;margin-top:24px}
+.tab-bar{display:flex;gap:0;border-bottom:1px solid #30363d;margin-bottom:20px;overflow-x:auto;-webkit-overflow-scrolling:touch;position:sticky;top:0;background:#0d1117;z-index:10;padding-top:4px}
+.tab-btn{background:none;border:none;color:#8b949e;padding:10px 20px;font-size:0.85em;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:color 0.15s,border-color 0.15s}
+.tab-btn:hover{color:#c9d1d9}
+.tab-btn.active{color:#58a6ff;border-bottom-color:#58a6ff}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.perf-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px}
+.perf-card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;text-align:center}
+.perf-card h3{font-size:0.78em;color:#8b949e;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px}
+.perf-val{font-size:1.8em;font-weight:700}
+.perf-sub{font-size:0.78em;color:#8b949e;margin-top:4px}
+@media(max-width:768px){.signals-grid{grid-template-columns:1fr}.stats-grid{grid-template-columns:1fr}.header{flex-direction:column;align-items:flex-start}.tab-btn{padding:8px 14px;font-size:0.8em}}
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- HEADER -->
+<div class="header">
+  <div>
+    <h1>Trading Bot</h1>
+    <div style="font-size:0.75em;color:#484f58">Updated: 2026-02-13 16:31 UTC &middot; Data: 2026-02-12</div>
+    <div style="font-size:0.72em;color:#6e7681;margin-top:4px">⏰ 스코어 및 매수/매도 신호는 하루 1회 (ET 16:30) 업데이트됩니다</div>
+  </div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <span class="badge badge-green">Active</span>
+    <span class="badge badge-gray">24 Tickers</span>
+  </div>
+</div>
+
+<!-- TAB BAR -->
+<div class="tab-bar">
+  <button class="tab-btn active" data-tab="overview">Overview</button>
+  <button class="tab-btn" data-tab="portfolio">Portfolio</button>
+  <button class="tab-btn" data-tab="performance">Performance</button>
+  <button class="tab-btn" data-tab="signals">Signals</button>
+</div>
+
+<!-- ═══ TAB: OVERVIEW ═══ -->
+<div class="tab-content active" id="tab-overview">
+
+
+
+    <div class="card" style="border:1px solid #58a6ff;margin-bottom:16px">
+      <h2 style="color:#58a6ff">Action Guide</h2>
+
+        <div class="guide-row guide-wait">
+          <div class="guide-icon">WAIT</div>
+          <div class="guide-text">
+            <div class="guide-title">대기 (재진입 조건 미충족)</div>
+            <div class="guide-desc"><b>IONQ</b> (MA20 $38.78, 음봉), <b>RKLB</b> (MA20 $77.75, 음봉), <b>IREN</b> (MA20 $49.96, 음봉), <b>PLTR</b> (MA20 $147.57, 음봉), <b>SMCI</b> (MA20 $31.53, 음봉), <b>COIN</b> (MA20 $182.64, 음봉), <b>MSTR</b> (MA20 $141.67, 음봉), <b>AFRM</b> (MA20 $61.48, 음봉), <b>HOOD</b> (MA20 $91.46, 음봉), <b>SOFI</b> (MA20 $22.47, 음봉), <b>QBTS</b> (MA20 $21.68, 음봉), <b>RGTI</b> (MA20 $18.73, 음봉), <b>SMR</b> (MA20 $17.55, 음봉), <b>SOUN</b> (MA20 $8.74, 음봉), <b>RCAT</b> (MA20 $13.66, 음봉), <b>ACHR</b> (MA20 $7.40, 음봉), <b>BBAI</b> (MA20 $5.03, 음봉), <b>ASTS</b> (MA20 $106.01, 음봉), <b>FNGU</b> (MA20 $21.30, 음봉), <b>NTLA</b> (MA20 $12.98, 음봉), <b>PL</b> (MA20 $24.13, 음봉), <b>LUNR</b> (MA20 $18.59, 음봉)</div>
+            <div class="guide-explain">재진입 조건 미충족. 아직 매수 금지.</div>
+          </div>
+        </div>
+        <div class="guide-row" style="border-bottom:none">
+          <div class="guide-icon" style="background:#3a1a1a;color:#f85149;border:1px solid #da3633">INV</div>
+          <div class="guide-text">
+            <div class="guide-title">인버스 헤지 활성</div>
+            <div class="guide-desc"><b>IONZ</b>(IONQ), <b>RKLZ</b>(RKLB), <b>IREZ</b>(IREN), <b>PLTZ</b>(PLTR), <b>SMCZ</b>(SMCI), <b>CONI</b>(COIN), <b>SMST</b>(MSTR), <b>HOOZ</b>(HOOD), <b>QBTZ</b>(QBTS), <b>RGTZ</b>(RGTI), <b>FNGD</b>(FNGU), <b>SQQQ</b>(SQQQ)</div>
+            <div class="guide-explain">11개 개별 숏 ETF + SQQQ.</div>
+          </div>
+        </div>
+      <div style="margin-top:12px;padding:10px;background:#0d1117;border-radius:6px;font-size:0.82em;color:#8b949e">
+        투자 대상 없음 — <b>100% 현금</b> 상태. 재진입 신호를 기다리세요. (인버스 SQQQ 64% 투자 중)
+      </div>
+    </div>
+
+
+<div class="stats-grid">
+  <div class="card">
+    <h2>Rotation Status</h2>
+    <div class="stat-value" style="color:#f85149">0/1</div>
+    <div class="stat-sub">Selected / Active</div>
+    <div style="margin-top:8px"><span class="chip-inactive">IONQ</span><span class="chip-inactive">RKLB</span><span class="chip-inactive">IREN</span><span class="chip-inactive">PLTR</span><span class="chip-inactive">SMCI</span><span class="chip-inactive">COIN</span><span class="chip-inactive">MSTR</span><span class="chip-inactive">AFRM</span><span class="chip-inactive">HOOD</span><span class="chip-inactive">SOFI</span><span class="chip-inactive">QBTS</span><span class="chip-inactive">RGTI</span><span class="chip-inactive">SMR</span><span class="chip-inactive">SOUN</span><span class="chip-inactive">RCAT</span><span class="chip-inactive">ACHR</span><span class="chip-inactive">BBAI</span><span class="chip-inactive">ASTS</span><span class="chip-inactive">FNGU</span><span class="chip-inactive">NTLA</span><span class="chip-inactive">PL</span><span class="chip-inactive">LUNR</span><span class="chip-active">APLD</span><span class="chip-inactive">AEHR</span></div>
+  </div>
+
+  <div class="card">
+    <h2>Macro Regime</h2>
+    <div class="stat-value" style="color:#f85149">0/3</div>
+    <div class="stat-sub">Bearish</div>
+    <div style="margin-top:8px">
+        <div class="macro-item">
+          <span style="color:#f85149">▼</span>
+          <span>BTC</span>
+          <span style="color:#f0f6fc">$66,222</span>
+          <span style="color:#f85149">-26.0%</span>
+        </div>
+
+        <div class="macro-item">
+          <span style="color:#f85149">▼</span>
+          <span>IWM</span>
+          <span style="color:#f0f6fc">$260</span>
+          <span style="color:#f85149">-2.0%</span>
+        </div>
+
+        <div class="macro-item">
+          <span style="color:#f85149">▼</span>
+          <span>QTUM</span>
+          <span style="color:#f0f6fc">$116</span>
+          <span style="color:#f85149">-2.4%</span>
+        </div>
+        </div>
+  </div>
+
+  <div class="card">
+    <h2>Strategy</h2>
+    <div style="font-size:0.85em;color:#8b949e">Proprietary multi-factor rotation with dynamic hedging</div>
+
+    <div style="margin-top:10px;padding-top:8px;border-top:1px solid #21262d">
+      <div style="font-size:0.85em;color:#484f58;margin-bottom:4px">Live Performance</div>
+      <div style="font-size:0.78em;color:#484f58;font-style:italic">
+        Awaiting first trade...
+      </div>
+    </div>
+  </div>
+</div>
+
+
+    <div class="card" style="margin-bottom:16px;border:1px solid #da3633">
+      <h2>Hedge Status</h2>
+      <div style="display:flex;gap:24px;align-items:center">
+        <div><div style="font-size:1.3em;font-weight:700;color:#f85149">HEDGE ON</div><div style="font-size:0.78em;color:#8b949e">Inverse active</div></div>
+      </div>
+    </div>
+
+
+    <div class="card" style="margin-top:16px">
+      <h2>Options Sentiment <span style="font-size:0.7em;color:#8b949e">(2026-02-12)</span></h2>
+      <div style="display:flex;gap:16px;margin-bottom:12px">
+        <div style="text-align:center;flex:1">
+          <div style="font-size:1.4em;font-weight:700;color:#d29922">0.68</div>
+          <div style="font-size:0.75em;color:#8b949e">Pool P/C Avg</div>
+        </div>
+        <div style="text-align:center;flex:1">
+          <div style="font-size:1.4em;font-weight:700;color:#f85149">1</div>
+          <div style="font-size:0.75em;color:#8b949e">Bearish (P/C&gt;1)</div>
+        </div>
+        <div style="text-align:center;flex:1">
+          <div style="font-size:1.4em;font-weight:700;color:#d29922">15</div>
+          <div style="font-size:0.75em;color:#8b949e">Neutral</div>
+        </div>
+        <div style="text-align:center;flex:1">
+          <div style="font-size:1.4em;font-weight:700;color:#3fb950">6</div>
+          <div style="font-size:0.75em;color:#8b949e">Bullish (P/C&lt;0.5)</div>
+        </div>
+      </div>
+      <table style="width:100%;font-size:0.82em;border-collapse:collapse">
+        <tr style="border-bottom:1px solid #30363d;color:#8b949e">
+          <th style="text-align:left;padding:4px">Ticker</th>
+          <th style="text-align:left;padding:4px">P/C OI</th>
+          <th style="text-align:left;padding:4px">P/C Vol</th>
+          <th style="text-align:left;padding:4px">Call OI</th>
+          <th style="text-align:left;padding:4px">Put OI</th>
+          <th style="text-align:left;padding:4px">Bias</th>
+        </tr>
+        <tr><td>IONQ</td><td style="color:#f85149;font-weight:600">1.49</td><td>1.60</td><td>64,422</td><td>96,096</td><td style="color:#f85149">Bearish</td></tr><tr><td>RKLB</td><td style="color:#d29922;font-weight:600">0.94</td><td>0.52</td><td>107,855</td><td>101,436</td><td style="color:#d29922">Neutral</td></tr><tr><td>IREN</td><td style="color:#d29922;font-weight:600">0.92</td><td>0.82</td><td>328,870</td><td>303,035</td><td style="color:#d29922">Neutral</td></tr><tr><td>MSTR</td><td style="color:#d29922;font-weight:600">0.86</td><td>1.00</td><td>548,559</td><td>470,931</td><td style="color:#d29922">Neutral</td></tr><tr><td>PL</td><td style="color:#d29922;font-weight:600">0.85</td><td>0.36</td><td>26,242</td><td>22,323</td><td style="color:#d29922">Neutral</td></tr><tr><td>SOFI</td><td style="color:#d29922;font-weight:600">0.85</td><td>0.74</td><td>565,973</td><td>479,329</td><td style="color:#d29922">Neutral</td></tr><tr><td>SMR</td><td style="color:#d29922;font-weight:600">0.85</td><td>0.81</td><td>148,454</td><td>125,509</td><td style="color:#d29922">Neutral</td></tr><tr><td>PLTR</td><td style="color:#d29922;font-weight:600">0.75</td><td>1.04</td><td>607,362</td><td>456,241</td><td style="color:#d29922">Neutral</td></tr><tr><td>RGTI</td><td style="color:#d29922;font-weight:600">0.71</td><td>0.67</td><td>164,000</td><td>116,714</td><td style="color:#d29922">Neutral</td></tr><tr><td>ASTS</td><td style="color:#d29922;font-weight:600">0.70</td><td>0.60</td><td>134,245</td><td>94,457</td><td style="color:#d29922">Neutral</td></tr><tr><td>APLD</td><td style="color:#d29922;font-weight:600">0.69</td><td>0.68</td><td>115,359</td><td>80,176</td><td style="color:#d29922">Neutral</td></tr><tr><td>SMCI</td><td style="color:#d29922;font-weight:600">0.63</td><td>0.63</td><td>354,152</td><td>223,475</td><td style="color:#d29922">Neutral</td></tr><tr><td>HOOD</td><td style="color:#d29922;font-weight:600">0.56</td><td>0.65</td><td>412,108</td><td>232,842</td><td style="color:#d29922">Neutral</td></tr><tr><td>LUNR</td><td style="color:#d29922;font-weight:600">0.56</td><td>0.86</td><td>59,364</td><td>33,299</td><td style="color:#d29922">Neutral</td></tr><tr><td>RCAT</td><td style="color:#d29922;font-weight:600">0.52</td><td>1.16</td><td>53,834</td><td>28,033</td><td style="color:#d29922">Neutral</td></tr><tr><td>AFRM</td><td style="color:#d29922;font-weight:600">0.51</td><td>0.90</td><td>70,440</td><td>35,979</td><td style="color:#d29922">Neutral</td></tr><tr><td>SOUN</td><td style="color:#3fb950;font-weight:600">0.49</td><td>0.26</td><td>121,181</td><td>59,212</td><td style="color:#3fb950">Bullish</td></tr><tr><td>COIN</td><td style="color:#3fb950;font-weight:600">0.45</td><td>2.45</td><td>246,647</td><td>111,935</td><td style="color:#3fb950">Bullish</td></tr><tr><td>QBTS</td><td style="color:#3fb950;font-weight:600">0.45</td><td>0.57</td><td>127,093</td><td>57,199</td><td style="color:#3fb950">Bullish</td></tr><tr><td>BBAI</td><td style="color:#3fb950;font-weight:600">0.38</td><td>0.71</td><td>149,746</td><td>57,628</td><td style="color:#3fb950">Bullish</td></tr><tr><td>NTLA</td><td style="color:#3fb950;font-weight:600">0.36</td><td>1.48</td><td>55,532</td><td>20,269</td><td style="color:#3fb950">Bullish</td></tr><tr><td>ACHR</td><td style="color:#3fb950;font-weight:600">0.35</td><td>0.74</td><td>144,134</td><td>50,744</td><td style="color:#3fb950">Bullish</td></tr>
+      </table>
+      <div style="margin-top:8px;font-size:0.72em;color:#484f58">
+        P/C OI = Put OI / Call OI (nearest 4 expiries) &middot; Updated daily via yfinance
+      </div>
+    </div>
+
+</div>
+
+<!-- ═══ TAB: PORTFOLIO ═══ -->
+<div class="tab-content" id="tab-portfolio">
+
+
+    <div class="card" style="margin-bottom:16px;border:1px solid #58a6ff">
+      <h2 style="color:#58a6ff">Real Portfolio (KIS)</h2>
+      <div class="stat-row" style="margin-bottom:10px">
+        <div>Equity: <span style="color:#f0f6fc">$101.81</span></div>
+        <div>Buying Power: <span style="color:#f0f6fc">$18.43</span></div>
+        <div>Positions: <span style="color:#f0f6fc">4</span></div>
+      </div>
+      <table style="width:100%;font-size:0.82em;border-collapse:collapse">
+        <thead><tr style="color:#8b949e;border-bottom:1px solid #21262d">
+          <th style="text-align:left;padding:4px 0">Ticker</th>
+          <th style="text-align:right">Qty</th>
+          <th style="text-align:right">Avg Cost</th>
+          <th style="text-align:right">Current</th>
+          <th style="text-align:right">Value</th>
+          <th style="text-align:right">P&L</th>
+        </tr></thead>
+        <tbody><tr><td style="color:#f0f6fc;font-weight:600">APLD</td><td style="text-align:right">1</td><td style="text-align:right">$38.33</td><td style="text-align:right">$36.17</td><td style="text-align:right">$36.17</td><td style="text-align:right;color:#f85149">$-2.16 (-5.6%)</td></tr><tr><td style="color:#f0f6fc;font-weight:600">IONZ</td><td style="text-align:right">1</td><td style="text-align:right">$27.64</td><td style="text-align:right">$31.12</td><td style="text-align:right">$31.12</td><td style="text-align:right;color:#3fb950">+$3.48 (+12.6%)</td></tr><tr><td style="color:#f0f6fc;font-weight:600">QBTZ</td><td style="text-align:right">1</td><td style="text-align:right">$9.91</td><td style="text-align:right">$12.04</td><td style="text-align:right">$12.04</td><td style="text-align:right;color:#3fb950">+$2.12 (+21.4%)</td></tr><tr><td style="color:#f0f6fc;font-weight:600">RKLZ</td><td style="text-align:right">1</td><td style="text-align:right">$3.30</td><td style="text-align:right">$4.05</td><td style="text-align:right">$4.05</td><td style="text-align:right;color:#3fb950">+$0.75 (+22.7%)</td></tr><tr style="border-top:1px solid #30363d;font-weight:600"><td style="color:#8b949e">합계</td><td></td><td></td><td></td><td style="text-align:right">$83.38</td><td style="text-align:right;color:#3fb950">+$4.20</td></tr></tbody>
+      </table>
+
+    <div style="margin-top:10px;padding:8px;background:#161b22;border-radius:6px;border:1px solid #30363d">
+      <div style="font-size:0.85em;color:#d29922;font-weight:600;margin-bottom:6px">Total Return (실현+미실현)</div>
+      <div style="display:flex;justify-content:space-between;font-size:0.82em">
+        <div>실현: <span style="color:#3fb950">+$0.00</span></div>
+        <div>미실현: <span style="color:#3fb950">+$4.20</span></div>
+        <div style="font-weight:600">합계: <span style="color:#3fb950">+$4.20 (+4.1%)</span></div>
+      </div>
+    </div>
+
+    </div>
+
+
+    <div class="card" style="margin-bottom:16px;border:1px solid #3fb950">
+      <h2 style="color:#3fb950">PAPER (가상매매 $10,000)</h2>
+      <div class="stat-row" style="margin-bottom:10px">
+        <div>Equity: <span style="color:#f0f6fc">$10,010.21</span></div>
+        <div>Cash: <span style="color:#f0f6fc">$5,001.31</span></div>
+        <div>Positions: <span style="color:#f0f6fc">1</span></div>
+      </div>
+      <table style="width:100%;font-size:0.82em;border-collapse:collapse">
+        <thead><tr style="color:#8b949e;border-bottom:1px solid #21262d">
+          <th style="text-align:left;padding:4px 0">Ticker</th>
+          <th style="text-align:right">Qty</th>
+          <th style="text-align:right">Avg Cost</th>
+          <th style="text-align:right">Current</th>
+          <th style="text-align:right">Value</th>
+          <th style="text-align:right">P&L</th>
+        </tr></thead>
+        <tbody><tr><td style="color:#f0f6fc;font-weight:600">SMCI</td><td style="text-align:right">149</td><td style="text-align:right">$33.53</td><td style="text-align:right">$33.62</td><td style="text-align:right">$5008.90</td><td style="text-align:right;color:#3fb950">+$12.93 (+0.3%)</td></tr><tr style="border-top:1px solid #30363d;font-weight:600"><td style="color:#8b949e">합계</td><td></td><td></td><td></td><td style="text-align:right">$5008.90</td><td style="text-align:right;color:#3fb950">+$12.93 (+0.3%)</td></tr></tbody>
+      </table>
+
+    <div style="margin-top:10px;padding:8px;background:#161b22;border-radius:6px;border:1px solid #30363d">
+      <div style="font-size:0.85em;color:#d29922;font-weight:600;margin-bottom:6px">Total Return</div>
+      <div style="display:flex;justify-content:space-between;font-size:0.85em">
+        <div>원금: <span style="color:#f0f6fc">$10,000</span></div>
+        <div>현재: <span style="color:#f0f6fc">$10,010.21</span></div>
+        <div style="font-weight:700;font-size:1.1em">P&L: <span style="color:#3fb950">+$10.21 (+0.1%)</span></div>
+      </div>
+    </div>
+
+    <div style="margin-top:10px;padding-top:8px;border-top:1px solid #21262d">
+      <div style="font-size:0.85em;color:#484f58;margin-bottom:4px">PAPER Performance</div>
+      <div style="font-size:0.78em;color:#484f58;font-style:italic">
+        Awaiting first trade...
+      </div>
+    </div>
+
+    <div style="margin-top:10px;padding-top:8px;border-top:1px solid #21262d">
+      <div style="font-size:0.85em;color:#d29922;margin-bottom:6px;font-weight:600">Closed Trades (실현 손익) (12건) <span style="color:#484f58;font-weight:400;font-size:0.85em">수수료 0.25%/편도 포함</span></div>
+      <table style="width:100%;font-size:0.82em;border-collapse:collapse">
+        <thead><tr style="color:#8b949e;border-bottom:1px solid #21262d">
+          <th style="text-align:left;padding:4px 0">Ticker</th>
+          <th style="text-align:right">Entry</th>
+          <th style="text-align:right">Exit</th>
+          <th style="text-align:right">Qty</th>
+          <th style="text-align:right">Hold</th>
+          <th style="text-align:right">P&L</th>
+          <th style="text-align:right">P&L%</th>
+          <th style="text-align:right">Date</th>
+        </tr></thead>
+        <tbody><tr><td style="color:#f0f6fc;font-weight:600">MSTZ</td><td style="text-align:right">$13.53</td><td style="text-align:right">$13.47</td><td style="text-align:right">27</td><td style="text-align:right">0d</td><td style="text-align:right;color:#f85149">$-3.44</td><td style="text-align:right;color:#f85149">-0.9%</td><td style="text-align:right;color:#484f58">2026-02-10</td></tr><tr><td style="color:#f0f6fc;font-weight:600">CONI</td><td style="text-align:right">$105.41</td><td style="text-align:right">$105.05</td><td style="text-align:right">6</td><td style="text-align:right">0d</td><td style="text-align:right;color:#f85149">$-5.32</td><td style="text-align:right;color:#f85149">-0.8%</td><td style="text-align:right;color:#484f58">2026-02-10</td></tr><tr><td style="color:#f0f6fc;font-weight:600">SQQQ</td><td style="text-align:right">$68.42</td><td style="text-align:right">$68.33</td><td style="text-align:right">5</td><td style="text-align:right">0d</td><td style="text-align:right;color:#f85149">$-2.16</td><td style="text-align:right;color:#f85149">-0.6%</td><td style="text-align:right;color:#484f58">2026-02-10</td></tr><tr><td style="color:#f0f6fc;font-weight:600">ASTN</td><td style="text-align:right">$16.35</td><td style="text-align:right">$16.35</td><td style="text-align:right">1</td><td style="text-align:right">0d</td><td style="text-align:right;color:#f85149">$-0.08</td><td style="text-align:right;color:#f85149">-0.5%</td><td style="text-align:right;color:#484f58">2026-02-10</td></tr><tr><td style="color:#f0f6fc;font-weight:600">FNGD</td><td style="text-align:right">$62.40</td><td style="text-align:right">$62.53</td><td style="text-align:right">2</td><td style="text-align:right">0d</td><td style="text-align:right;color:#f85149">$-0.36</td><td style="text-align:right;color:#f85149">-0.3%</td><td style="text-align:right;color:#484f58">2026-02-10</td></tr><tr><td style="color:#f0f6fc;font-weight:600">IREZ</td><td style="text-align:right">$25.14</td><td style="text-align:right">$24.94</td><td style="text-align:right">13</td><td style="text-align:right">0d</td><td style="text-align:right;color:#f85149">$-4.23</td><td style="text-align:right;color:#f85149">-1.3%</td><td style="text-align:right;color:#484f58">2026-02-10</td></tr><tr><td style="color:#f0f6fc;font-weight:600">RGTZ</td><td style="text-align:right">$23.82</td><td style="text-align:right">$23.88</td><td style="text-align:right">26</td><td style="text-align:right">0d</td><td style="text-align:right;color:#f85149">$-1.54</td><td style="text-align:right;color:#f85149">-0.2%</td><td style="text-align:right;color:#484f58">2026-02-10</td></tr><tr><td style="color:#f0f6fc;font-weight:600">PLTZ</td><td style="text-align:right">$32.85</td><td style="text-align:right">$32.89</td><td style="text-align:right">9</td><td style="text-align:right">0d</td><td style="text-align:right;color:#f85149">$-1.12</td><td style="text-align:right;color:#f85149">-0.4%</td><td style="text-align:right;color:#484f58">2026-02-10</td></tr><tr><td style="color:#f0f6fc;font-weight:600">RKLZ</td><td style="text-align:right">$3.17</td><td style="text-align:right">$3.18</td><td style="text-align:right">104</td><td style="text-align:right">0d</td><td style="text-align:right;color:#f85149">$-0.61</td><td style="text-align:right;color:#f85149">-0.2%</td><td style="text-align:right;color:#484f58">2026-02-10</td></tr><tr><td style="color:#f0f6fc;font-weight:600">HOOZ</td><td style="text-align:right">$32.87</td><td style="text-align:right">$32.53</td><td style="text-align:right">13</td><td style="text-align:right">0d</td><td style="text-align:right;color:#f85149">$-6.55</td><td style="text-align:right;color:#f85149">-1.5%</td><td style="text-align:right;color:#484f58">2026-02-10</td></tr><tr><td style="color:#f0f6fc;font-weight:600">IONZ</td><td style="text-align:right">$25.08</td><td style="text-align:right">$25.11</td><td style="text-align:right">25</td><td style="text-align:right">0d</td><td style="text-align:right;color:#f85149">$-2.39</td><td style="text-align:right;color:#f85149">-0.4%</td><td style="text-align:right;color:#484f58">2026-02-10</td></tr><tr><td style="color:#f0f6fc;font-weight:600">QBTZ</td><td style="text-align:right">$9.84</td><td style="text-align:right">$9.94</td><td style="text-align:right">45</td><td style="text-align:right">0d</td><td style="text-align:right;color:#3fb950">+$2.27</td><td style="text-align:right;color:#3fb950">+0.5%</td><td style="text-align:right;color:#484f58">2026-02-10</td></tr><tr style="border-top:1px solid #30363d;font-weight:600"><td style="color:#8b949e">합계 (12건)</td><td></td><td></td><td></td><td style="text-align:right;color:#8b949e">1W/11L</td><td style="text-align:right;color:#f85149">$-25.53</td><td style="text-align:right;color:#8b949e">8%</td><td></td></tr></tbody>
+      </table>
+
+    </div>
+
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <h2>Portfolio Allocation</h2>
+      <div style="display:flex;gap:1px;border-radius:6px;overflow:hidden;margin-bottom:12px">
+        <div style="flex:6.7;background:#f85149;height:24px;position:relative;min-width:30px" title="IONZ 6.7%"><span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:0.65em;font-weight:600;color:#0d1117;white-space:nowrap">IONZ</span></div><div style="flex:5.1;background:#f85149;height:24px;position:relative;min-width:30px" title="RKLZ 5.1%"><span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:0.65em;font-weight:600;color:#0d1117;white-space:nowrap">RKLZ</span></div><div style="flex:5.8;background:#f85149;height:24px;position:relative;min-width:30px" title="IREZ 5.8%"><span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:0.65em;font-weight:600;color:#0d1117;white-space:nowrap">IREZ</span></div><div style="flex:4.7;background:#f85149;height:24px;position:relative;min-width:30px" title="PLTZ 4.7%"><span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:0.65em;font-weight:600;color:#0d1117;white-space:nowrap">PLTZ</span></div><div style="flex:0.8;background:#f85149;height:24px;position:relative;min-width:30px" title="SMCZ 0.8%"><span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:0.65em;font-weight:600;color:#0d1117;white-space:nowrap">SMCZ</span></div><div style="flex:6.9;background:#f85149;height:24px;position:relative;min-width:30px" title="CONI 6.9%"><span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:0.65em;font-weight:600;color:#0d1117;white-space:nowrap">CONI</span></div><div style="flex:4.9;background:#f85149;height:24px;position:relative;min-width:30px" title="SMST 4.9%"><span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:0.65em;font-weight:600;color:#0d1117;white-space:nowrap">SMST</span></div><div style="flex:6.6;background:#f85149;height:24px;position:relative;min-width:30px" title="HOOZ 6.6%"><span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:0.65em;font-weight:600;color:#0d1117;white-space:nowrap">HOOZ</span></div><div style="flex:5.3;background:#f85149;height:24px;position:relative;min-width:30px" title="QBTZ 5.3%"><span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:0.65em;font-weight:600;color:#0d1117;white-space:nowrap">QBTZ</span></div><div style="flex:7.1;background:#f85149;height:24px;position:relative;min-width:30px" title="RGTZ 7.1%"><span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:0.65em;font-weight:600;color:#0d1117;white-space:nowrap">RGTZ</span></div><div style="flex:4.3;background:#f85149;height:24px;position:relative;min-width:30px" title="FNGD 4.3%"><span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:0.65em;font-weight:600;color:#0d1117;white-space:nowrap">FNGD</span></div><div style="flex:5.3;background:#f85149;height:24px;position:relative;min-width:30px" title="SQQQ 5.3%"><span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:0.65em;font-weight:600;color:#0d1117;white-space:nowrap">SQQQ</span></div><div style="flex:36.4;background:#21262d;height:24px;position:relative;min-width:30px" title="Cash 36.4%"><span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:0.65em;font-weight:600;color:#8b949e;white-space:nowrap">Cash</span></div>
+      </div>
+      <table style="width:100%;font-size:0.82em;border-collapse:collapse">
+        <thead><tr style="color:#8b949e;border-bottom:1px solid #21262d">
+          <th style="text-align:center;padding:4px 0;width:36px">Rank</th>
+          <th style="text-align:left">Ticker</th>
+          <th style="text-align:left">Signal</th>
+          <th style="text-align:right">1M Mom</th>
+          <th style="text-align:right">Weight</th>
+          <th style="text-align:left;padding-left:8px">Score</th>
+          <th style="text-align:left"></th>
+        </tr></thead>
+        <tbody><tr style="opacity:0.5"><td style="text-align:center;color:#484f58">0</td><td style="color:#8b949e">APLD</td><td><span style="color:#d29922">HOLD</span></td><td style="text-align:right;color:#f85149">-4.0%</td><td style="text-align:right;color:#484f58">0%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#d29922;font-weight:700;min-width:24px">48</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:48%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#484f58">미선택</td></tr><tr style="opacity:0.6"><td style="text-align:center;color:#484f58">-</td><td style="color:#8b949e">IONQ</td><td><span style="color:#d29922">WAIT</span></td><td style="text-align:right;color:#484f58">-</td><td style="text-align:right;color:#484f58">0%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#d29922;font-weight:700;min-width:24px">10</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:10%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#8b949e">재진입 멀음</td></tr><tr style="opacity:0.6"><td style="text-align:center;color:#484f58">-</td><td style="color:#8b949e">RKLB</td><td><span style="color:#d29922">WAIT</span></td><td style="text-align:right;color:#484f58">-</td><td style="text-align:right;color:#484f58">0%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#d29922;font-weight:700;min-width:24px">7</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:7%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#8b949e">재진입 멀음</td></tr><tr style="opacity:0.6"><td style="text-align:center;color:#484f58">-</td><td style="color:#8b949e">IREN</td><td><span style="color:#d29922">WAIT</span></td><td style="text-align:right;color:#484f58">-</td><td style="text-align:right;color:#484f58">0%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#d29922;font-weight:700;min-width:24px">7</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:7%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#8b949e">재진입 멀음</td></tr><tr style="opacity:0.6"><td style="text-align:center;color:#484f58">-</td><td style="color:#8b949e">PLTR</td><td><span style="color:#d29922">WAIT</span></td><td style="text-align:right;color:#484f58">-</td><td style="text-align:right;color:#484f58">0%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#d29922;font-weight:700;min-width:24px">7</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:7%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#8b949e">재진입 멀음</td></tr><tr style="opacity:0.6"><td style="text-align:center;color:#484f58">-</td><td style="color:#8b949e">SMCI</td><td><span style="color:#d29922">WAIT</span></td><td style="text-align:right;color:#484f58">-</td><td style="text-align:right;color:#484f58">0%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#d29922;font-weight:700;min-width:24px">32</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:32%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#8b949e">대기</td></tr><tr style="opacity:0.6"><td style="text-align:center;color:#484f58">-</td><td style="color:#8b949e">COIN</td><td><span style="color:#d29922">WAIT</span></td><td style="text-align:right;color:#484f58">-</td><td style="text-align:right;color:#484f58">0%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#d29922;font-weight:700;min-width:24px">10</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:10%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#8b949e">재진입 멀음</td></tr><tr style="opacity:0.6"><td style="text-align:center;color:#484f58">-</td><td style="color:#8b949e">MSTR</td><td><span style="color:#d29922">WAIT</span></td><td style="text-align:right;color:#484f58">-</td><td style="text-align:right;color:#484f58">0%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#d29922;font-weight:700;min-width:24px">7</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:7%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#8b949e">재진입 멀음</td></tr><tr style="opacity:0.6"><td style="text-align:center;color:#484f58">-</td><td style="color:#8b949e">AFRM</td><td><span style="color:#d29922">WAIT</span></td><td style="text-align:right;color:#484f58">-</td><td style="text-align:right;color:#484f58">0%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#d29922;font-weight:700;min-width:24px">10</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:10%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#8b949e">재진입 멀음</td></tr><tr style="opacity:0.6"><td style="text-align:center;color:#484f58">-</td><td style="color:#8b949e">HOOD</td><td><span style="color:#d29922">WAIT</span></td><td style="text-align:right;color:#484f58">-</td><td style="text-align:right;color:#484f58">0%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#d29922;font-weight:700;min-width:24px">10</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:10%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#8b949e">재진입 멀음</td></tr><tr style="opacity:0.6"><td style="text-align:center;color:#484f58">-</td><td style="color:#8b949e">SOFI</td><td><span style="color:#d29922">WAIT</span></td><td style="text-align:right;color:#484f58">-</td><td style="text-align:right;color:#484f58">0%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#d29922;font-weight:700;min-width:24px">10</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:10%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#8b949e">재진입 멀음</td></tr><tr style="opacity:0.6"><td style="text-align:center;color:#484f58">-</td><td style="color:#8b949e">QBTS</td><td><span style="color:#d29922">WAIT</span></td><td style="text-align:right;color:#484f58">-</td><td style="text-align:right;color:#484f58">0%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#d29922;font-weight:700;min-width:24px">7</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:7%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#8b949e">재진입 멀음</td></tr><tr style="opacity:0.6"><td style="text-align:center;color:#484f58">-</td><td style="color:#8b949e">RGTI</td><td><span style="color:#d29922">WAIT</span></td><td style="text-align:right;color:#484f58">-</td><td style="text-align:right;color:#484f58">0%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#d29922;font-weight:700;min-width:24px">10</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:10%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#8b949e">재진입 멀음</td></tr><tr style="opacity:0.6"><td style="text-align:center;color:#484f58">-</td><td style="color:#8b949e">SMR</td><td><span style="color:#d29922">WAIT</span></td><td style="text-align:right;color:#484f58">-</td><td style="text-align:right;color:#484f58">0%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#d29922;font-weight:700;min-width:24px">7</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:7%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#8b949e">재진입 멀음</td></tr><tr style="opacity:0.6"><td style="text-align:center;color:#484f58">-</td><td style="color:#8b949e">SOUN</td><td><span style="color:#d29922">WAIT</span></td><td style="text-align:right;color:#484f58">-</td><td style="text-align:right;color:#484f58">0%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#d29922;font-weight:700;min-width:24px">7</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:7%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#8b949e">재진입 멀음</td></tr><tr style="opacity:0.6"><td style="text-align:center;color:#484f58">-</td><td style="color:#8b949e">RCAT</td><td><span style="color:#d29922">WAIT</span></td><td style="text-align:right;color:#484f58">-</td><td style="text-align:right;color:#484f58">0%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#d29922;font-weight:700;min-width:24px">4</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:4%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#8b949e">재진입 멀음</td></tr><tr style="opacity:0.6"><td style="text-align:center;color:#484f58">-</td><td style="color:#8b949e">ACHR</td><td><span style="color:#d29922">WAIT</span></td><td style="text-align:right;color:#484f58">-</td><td style="text-align:right;color:#484f58">0%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#d29922;font-weight:700;min-width:24px">9</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:9%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#8b949e">재진입 멀음</td></tr><tr style="opacity:0.6"><td style="text-align:center;color:#484f58">-</td><td style="color:#8b949e">BBAI</td><td><span style="color:#d29922">WAIT</span></td><td style="text-align:right;color:#484f58">-</td><td style="text-align:right;color:#484f58">0%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#d29922;font-weight:700;min-width:24px">7</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:7%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#8b949e">재진입 멀음</td></tr><tr style="opacity:0.6"><td style="text-align:center;color:#484f58">-</td><td style="color:#8b949e">ASTS</td><td><span style="color:#d29922">WAIT</span></td><td style="text-align:right;color:#484f58">-</td><td style="text-align:right;color:#484f58">0%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#d29922;font-weight:700;min-width:24px">7</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:7%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#8b949e">재진입 멀음</td></tr><tr style="opacity:0.6"><td style="text-align:center;color:#484f58">-</td><td style="color:#8b949e">FNGU</td><td><span style="color:#d29922">WAIT</span></td><td style="text-align:right;color:#484f58">-</td><td style="text-align:right;color:#484f58">0%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#d29922;font-weight:700;min-width:24px">10</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:10%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#8b949e">재진입 멀음</td></tr><tr style="opacity:0.6"><td style="text-align:center;color:#484f58">-</td><td style="color:#8b949e">NTLA</td><td><span style="color:#d29922">WAIT</span></td><td style="text-align:right;color:#484f58">-</td><td style="text-align:right;color:#484f58">0%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#d29922;font-weight:700;min-width:24px">4</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:4%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#8b949e">재진입 멀음</td></tr><tr style="opacity:0.6"><td style="text-align:center;color:#484f58">-</td><td style="color:#8b949e">PL</td><td><span style="color:#d29922">WAIT</span></td><td style="text-align:right;color:#484f58">-</td><td style="text-align:right;color:#484f58">0%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#d29922;font-weight:700;min-width:24px">4</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:4%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#8b949e">재진입 멀음</td></tr><tr style="opacity:0.6"><td style="text-align:center;color:#484f58">-</td><td style="color:#8b949e">LUNR</td><td><span style="color:#d29922">WAIT</span></td><td style="text-align:right;color:#484f58">-</td><td style="text-align:right;color:#484f58">0%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#d29922;font-weight:700;min-width:24px">4</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:4%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#8b949e">재진입 멀음</td></tr><tr><td style="text-align:center">-</td><td style="color:#f85149;font-weight:600">RGTZ <span style='font-size:0.85em;color:#8b949e'>(RGTI 숏)</span></td><td><span style="color:#f85149">SHORT</span></td><td style="text-align:right;color:#f85149">-36.1%</td><td style="text-align:right">7.1%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#f85149;font-weight:700;min-width:24px">7</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:11%;background:#f85149;border-radius:2px"></div></div></div></td><td style="color:#8b949e">BiDir+Cross(BTC/Gold)</td></tr><tr><td style="text-align:center">-</td><td style="color:#f85149;font-weight:600">CONI <span style='font-size:0.85em;color:#8b949e'>(COIN 숏)</span></td><td><span style="color:#f85149">SHORT</span></td><td style="text-align:right;color:#f85149">-35.0%</td><td style="text-align:right">6.9%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#f85149;font-weight:700;min-width:24px">7</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:11%;background:#f85149;border-radius:2px"></div></div></div></td><td style="color:#8b949e">BiDir+Cross(BTC/Gold)</td></tr><tr><td style="text-align:center">-</td><td style="color:#f85149;font-weight:600">IONZ <span style='font-size:0.85em;color:#8b949e'>(IONQ 숏)</span></td><td><span style="color:#f85149">SHORT</span></td><td style="text-align:right;color:#f85149">-33.8%</td><td style="text-align:right">6.7%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#f85149;font-weight:700;min-width:24px">7</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:11%;background:#f85149;border-radius:2px"></div></div></div></td><td style="color:#8b949e">BiDir+Cross(BTC/Gold)</td></tr><tr><td style="text-align:center">-</td><td style="color:#f85149;font-weight:600">HOOZ <span style='font-size:0.85em;color:#8b949e'>(HOOD 숏)</span></td><td><span style="color:#f85149">SHORT</span></td><td style="text-align:right;color:#f85149">-33.5%</td><td style="text-align:right">6.6%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#f85149;font-weight:700;min-width:24px">7</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:10%;background:#f85149;border-radius:2px"></div></div></div></td><td style="color:#8b949e">BiDir+Cross(BTC/Gold)</td></tr><tr><td style="text-align:center">-</td><td style="color:#f85149;font-weight:600">IREZ <span style='font-size:0.85em;color:#8b949e'>(IREN 숏)</span></td><td><span style="color:#f85149">SHORT</span></td><td style="text-align:right;color:#f85149">-29.4%</td><td style="text-align:right">5.8%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#f85149;font-weight:700;min-width:24px">6</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:9%;background:#f85149;border-radius:2px"></div></div></div></td><td style="color:#8b949e">BiDir+Cross(BTC/Gold)</td></tr><tr><td style="text-align:center">-</td><td style="color:#f85149;font-weight:600">SQQQ <span style='font-size:0.85em;color:#8b949e'>(Hedge)</span></td><td><span style="color:#f85149">SHORT</span></td><td style="text-align:right;color:#484f58">-</td><td style="text-align:right">5.3%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#f85149;font-weight:700;min-width:24px">5</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:8%;background:#f85149;border-radius:2px"></div></div></div></td><td style="color:#8b949e">BiDir+Cross(BTC/Gold)</td></tr><tr><td style="text-align:center">-</td><td style="color:#f85149;font-weight:600">QBTZ <span style='font-size:0.85em;color:#8b949e'>(QBTS 숏)</span></td><td><span style="color:#f85149">SHORT</span></td><td style="text-align:right;color:#f85149">-26.6%</td><td style="text-align:right">5.3%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#f85149;font-weight:700;min-width:24px">5</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:8%;background:#f85149;border-radius:2px"></div></div></div></td><td style="color:#8b949e">BiDir+Cross(BTC/Gold)</td></tr><tr><td style="text-align:center">-</td><td style="color:#f85149;font-weight:600">RKLZ <span style='font-size:0.85em;color:#8b949e'>(RKLB 숏)</span></td><td><span style="color:#f85149">SHORT</span></td><td style="text-align:right;color:#f85149">-25.7%</td><td style="text-align:right">5.1%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#f85149;font-weight:700;min-width:24px">5</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:8%;background:#f85149;border-radius:2px"></div></div></div></td><td style="color:#8b949e">BiDir+Cross(BTC/Gold)</td></tr><tr><td style="text-align:center">-</td><td style="color:#f85149;font-weight:600">SMST <span style='font-size:0.85em;color:#8b949e'>(MSTR 숏)</span></td><td><span style="color:#f85149">SHORT</span></td><td style="text-align:right;color:#f85149">-24.6%</td><td style="text-align:right">4.9%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#f85149;font-weight:700;min-width:24px">5</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:8%;background:#f85149;border-radius:2px"></div></div></div></td><td style="color:#8b949e">BiDir+Cross(BTC/Gold)</td></tr><tr><td style="text-align:center">-</td><td style="color:#f85149;font-weight:600">PLTZ <span style='font-size:0.85em;color:#8b949e'>(PLTR 숏)</span></td><td><span style="color:#f85149">SHORT</span></td><td style="text-align:right;color:#f85149">-23.9%</td><td style="text-align:right">4.7%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#f85149;font-weight:700;min-width:24px">5</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:7%;background:#f85149;border-radius:2px"></div></div></div></td><td style="color:#8b949e">BiDir+Cross(BTC/Gold)</td></tr><tr><td style="text-align:center">-</td><td style="color:#f85149;font-weight:600">FNGD <span style='font-size:0.85em;color:#8b949e'>(FNGU 숏)</span></td><td><span style="color:#f85149">SHORT</span></td><td style="text-align:right;color:#f85149">-21.8%</td><td style="text-align:right">4.3%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#f85149;font-weight:700;min-width:24px">4</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:7%;background:#f85149;border-radius:2px"></div></div></div></td><td style="color:#8b949e">BiDir+Cross(BTC/Gold)</td></tr><tr><td style="text-align:center">-</td><td style="color:#f85149;font-weight:600">SMCZ <span style='font-size:0.85em;color:#8b949e'>(SMCI 숏)</span></td><td><span style="color:#f85149">SHORT</span></td><td style="text-align:right;color:#f85149">-4.0%</td><td style="text-align:right">0.8%</td><td><div style="display:flex;align-items:center;gap:4px"><span style="color:#f85149;font-weight:700;min-width:24px">1</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden;min-width:40px"><div style="height:100%;width:1%;background:#f85149;border-radius:2px"></div></div></div></td><td style="color:#8b949e">BiDir+Cross(BTC/Gold)</td></tr></tbody>
+      </table>
+      <div style="margin-top:8px;font-size:0.75em;color:#484f58">
+        1개 활성 &rarr; 0개 선택 &rarr; Long 0% + Inv 64% = 총 64% 투자.
+      </div>
+    </div>
+
+</div>
+
+<!-- ═══ TAB: PERFORMANCE ═══ -->
+<div class="tab-content" id="tab-performance">
+
+
+    <div class="perf-grid">
+      <div class="perf-card" style="border-color:#3fb950">
+              <h3>SIM (Paper)</h3>
+              <div class="perf-val" style="color:#484f58">--</div>
+              <div class="perf-sub">데이터 수집 중...</div>
+            </div>
+      <div class="perf-card" style="border-color:#a371f7">
+              <h3>VIRTUAL (모의)</h3>
+              <div class="perf-val" style="color:#484f58">--</div>
+              <div class="perf-sub">데이터 수집 중...</div>
+            </div>
+      <div class="perf-card" style="border-color:#58a6ff">
+              <h3>REAL (실전)</h3>
+              <div class="perf-val" style="color:#484f58">--</div>
+              <div class="perf-sub">데이터 수집 중...</div>
+            </div>
+    </div>
+
+        <div class="card" style="margin-bottom:16px">
+          <h2>Equity Curve (수익률 %)</h2>
+          <div style="height:300px;position:relative">
+            <canvas id="perf-equity-chart"></canvas>
+          </div>
+        </div>
+
+
+</div>
+
+<!-- ═══ TAB: SIGNALS ═══ -->
+<div class="tab-content" id="tab-signals">
+
+
+    <div class="card" style="margin-bottom:20px;overflow-x:auto">
+      <h2>Signal Strength Rankings</h2>
+      <div style="margin-bottom:10px;padding:8px 12px;background:#161b22;border-radius:6px;font-size:0.78em;color:#8b949e;line-height:1.6">
+        <strong style="color:#c9d1d9">Score</strong> = 종합 건강도 (높을수록 좋음) &nbsp;|&nbsp;
+        <strong style="color:#c9d1d9">Signal</strong> = 매매 판단 (별개 시스템)
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:0.82em">
+        <thead>
+          <tr style="border-bottom:2px solid #30363d;color:#8b949e;text-align:left">
+            <th style="padding:6px 8px;text-align:center;width:30px">#</th>
+            <th style="padding:6px 8px">Ticker</th>
+            <th style="padding:6px 8px">Signal</th>
+            <th style="padding:6px 8px;text-align:right">Price</th>
+            <th style="padding:6px 8px;text-align:right">1D</th>
+            <th style="padding:6px 8px;text-align:right">1W</th>
+            <th style="padding:6px 8px;text-align:right">1M</th>
+            <th style="padding:6px 8px;text-align:center">RSI</th>
+            <th style="padding:6px 8px;min-width:100px">Score</th>
+            <th style="padding:6px 8px">Label</th>
+          </tr>
+        </thead>
+        <tbody><tr style=""><td style="text-align:center;color:#484f58">1</td><td style="color:#f0f6fc;">APLD</td><td><span style="color:#3fb950;font-weight:600">HOLD</span></td><td style="text-align:right">$36.17</td><td style="text-align:right;color:#3fb950">+0.0%</td><td style="text-align:right;color:#3fb950">+3.5%</td><td style="text-align:right;color:#f85149">-4.0%</td><td style="text-align:center">52</td><td><div style="display:flex;align-items:center;gap:4px;min-width:80px"><span style="color:#3fb950;font-weight:700;min-width:24px">48</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden"><div style="height:100%;width:48%;background:#3fb950;border-radius:2px"></div></div></div></td><td style="color:#3fb950;font-size:0.85em">양호</td></tr><tr style="opacity:0.55;"><td style="text-align:center;color:#484f58">2</td><td style="color:#f0f6fc;">SMCI</td><td><span style="color:#8b949e;font-weight:600">WAIT</span></td><td style="text-align:right">$30.43</td><td style="text-align:right;color:#3fb950">+0.0%</td><td style="text-align:right;color:#f85149">-11.5%</td><td style="text-align:right;color:#f85149">-4.0%</td><td style="text-align:center">45</td><td><div style="display:flex;align-items:center;gap:4px;min-width:80px"><span style="color:#d29922;font-weight:700;min-width:24px">32</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden"><div style="height:100%;width:32%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#d29922;font-size:0.85em">대기</td></tr><tr style="opacity:0.55;"><td style="text-align:center;color:#484f58">3</td><td style="color:#f0f6fc;">IONQ</td><td><span style="color:#8b949e;font-weight:600">WAIT</span></td><td style="text-align:right">$31.30</td><td style="text-align:right;color:#3fb950">+0.0%</td><td style="text-align:right;color:#f85149">-10.5%</td><td style="text-align:right;color:#f85149">-33.8%</td><td style="text-align:center">28</td><td><div style="display:flex;align-items:center;gap:4px;min-width:80px"><span style="color:#d29922;font-weight:700;min-width:24px">10</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden"><div style="height:100%;width:10%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#d29922;font-size:0.85em">재진입 멀음</td></tr><tr style="opacity:0.55;"><td style="text-align:center;color:#484f58">4</td><td style="color:#f0f6fc;">COIN</td><td><span style="color:#8b949e;font-weight:600">WAIT</span></td><td style="text-align:right">$141.09</td><td style="text-align:right;color:#3fb950">+0.0%</td><td style="text-align:right;color:#f85149">-14.6%</td><td style="text-align:right;color:#f85149">-35.0%</td><td style="text-align:center">21</td><td><div style="display:flex;align-items:center;gap:4px;min-width:80px"><span style="color:#d29922;font-weight:700;min-width:24px">10</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden"><div style="height:100%;width:10%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#d29922;font-size:0.85em">재진입 멀음</td></tr><tr style="opacity:0.55;"><td style="text-align:center;color:#484f58">5</td><td style="color:#f0f6fc;">AFRM</td><td><span style="color:#8b949e;font-weight:600">WAIT</span></td><td style="text-align:right">$49.76</td><td style="text-align:right;color:#3fb950">+0.0%</td><td style="text-align:right;color:#f85149">-12.7%</td><td style="text-align:right;color:#f85149">-30.3%</td><td style="text-align:center">20</td><td><div style="display:flex;align-items:center;gap:4px;min-width:80px"><span style="color:#d29922;font-weight:700;min-width:24px">10</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden"><div style="height:100%;width:10%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#d29922;font-size:0.85em">재진입 멀음</td></tr><tr style="opacity:0.55;"><td style="text-align:center;color:#484f58">6</td><td style="color:#f0f6fc;">HOOD</td><td><span style="color:#8b949e;font-weight:600">WAIT</span></td><td style="text-align:right">$71.12</td><td style="text-align:right;color:#3fb950">+0.0%</td><td style="text-align:right;color:#f85149">-14.1%</td><td style="text-align:right;color:#f85149">-33.5%</td><td style="text-align:center">24</td><td><div style="display:flex;align-items:center;gap:4px;min-width:80px"><span style="color:#d29922;font-weight:700;min-width:24px">10</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden"><div style="height:100%;width:10%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#d29922;font-size:0.85em">재진입 멀음</td></tr><tr style="opacity:0.55;"><td style="text-align:center;color:#484f58">7</td><td style="color:#f0f6fc;">SOFI</td><td><span style="color:#8b949e;font-weight:600">WAIT</span></td><td style="text-align:right">$19.30</td><td style="text-align:right;color:#3fb950">+0.0%</td><td style="text-align:right;color:#f85149">-7.5%</td><td style="text-align:right;color:#f85149">-25.3%</td><td style="text-align:center">24</td><td><div style="display:flex;align-items:center;gap:4px;min-width:80px"><span style="color:#d29922;font-weight:700;min-width:24px">10</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden"><div style="height:100%;width:10%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#d29922;font-size:0.85em">재진입 멀음</td></tr><tr style="opacity:0.55;"><td style="text-align:center;color:#484f58">8</td><td style="color:#f0f6fc;">RGTI</td><td><span style="color:#8b949e;font-weight:600">WAIT</span></td><td style="text-align:right">$14.99</td><td style="text-align:right;color:#3fb950">+0.0%</td><td style="text-align:right;color:#f85149">-15.4%</td><td style="text-align:right;color:#f85149">-36.1%</td><td style="text-align:center">28</td><td><div style="display:flex;align-items:center;gap:4px;min-width:80px"><span style="color:#d29922;font-weight:700;min-width:24px">10</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden"><div style="height:100%;width:10%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#d29922;font-size:0.85em">재진입 멀음</td></tr><tr style="opacity:0.55;"><td style="text-align:center;color:#484f58">9</td><td style="color:#f0f6fc;">FNGU</td><td><span style="color:#8b949e;font-weight:600">WAIT</span></td><td style="text-align:right">$17.87</td><td style="text-align:right;color:#3fb950">+0.0%</td><td style="text-align:right;color:#f85149">-7.6%</td><td style="text-align:right;color:#f85149">-21.8%</td><td style="text-align:center">27</td><td><div style="display:flex;align-items:center;gap:4px;min-width:80px"><span style="color:#d29922;font-weight:700;min-width:24px">10</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden"><div style="height:100%;width:10%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#d29922;font-size:0.85em">재진입 멀음</td></tr><tr style="opacity:0.55;"><td style="text-align:center;color:#484f58">10</td><td style="color:#f0f6fc;">ACHR</td><td><span style="color:#8b949e;font-weight:600">WAIT</span></td><td style="text-align:right">$6.76</td><td style="text-align:right;color:#3fb950">+0.0%</td><td style="text-align:right;color:#f85149">-7.4%</td><td style="text-align:right;color:#f85149">-21.5%</td><td style="text-align:center">35</td><td><div style="display:flex;align-items:center;gap:4px;min-width:80px"><span style="color:#d29922;font-weight:700;min-width:24px">9</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden"><div style="height:100%;width:9%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#d29922;font-size:0.85em">재진입 멀음</td></tr><tr style="opacity:0.55;"><td style="text-align:center;color:#484f58">11</td><td style="color:#f0f6fc;">RKLB</td><td><span style="color:#8b949e;font-weight:600">WAIT</span></td><td style="text-align:right">$66.01</td><td style="text-align:right;color:#3fb950">+0.0%</td><td style="text-align:right;color:#f85149">-8.7%</td><td style="text-align:right;color:#f85149">-25.7%</td><td style="text-align:center">37</td><td><div style="display:flex;align-items:center;gap:4px;min-width:80px"><span style="color:#d29922;font-weight:700;min-width:24px">7</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden"><div style="height:100%;width:7%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#d29922;font-size:0.85em">재진입 멀음</td></tr><tr style="opacity:0.55;"><td style="text-align:center;color:#484f58">12</td><td style="color:#f0f6fc;">IREN</td><td><span style="color:#8b949e;font-weight:600">WAIT</span></td><td style="text-align:right">$40.03</td><td style="text-align:right;color:#3fb950">+0.0%</td><td style="text-align:right;color:#f85149">-4.3%</td><td style="text-align:right;color:#f85149">-29.4%</td><td style="text-align:center">37</td><td><div style="display:flex;align-items:center;gap:4px;min-width:80px"><span style="color:#d29922;font-weight:700;min-width:24px">7</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden"><div style="height:100%;width:7%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#d29922;font-size:0.85em">재진입 멀음</td></tr><tr style="opacity:0.55;"><td style="text-align:center;color:#484f58">13</td><td style="color:#f0f6fc;">PLTR</td><td><span style="color:#8b949e;font-weight:600">WAIT</span></td><td style="text-align:right">$129.13</td><td style="text-align:right;color:#3fb950">+0.0%</td><td style="text-align:right;color:#f85149">-5.0%</td><td style="text-align:right;color:#f85149">-23.9%</td><td style="text-align:center">30</td><td><div style="display:flex;align-items:center;gap:4px;min-width:80px"><span style="color:#d29922;font-weight:700;min-width:24px">7</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden"><div style="height:100%;width:7%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#d29922;font-size:0.85em">재진입 멀음</td></tr><tr style="opacity:0.55;"><td style="text-align:center;color:#484f58">14</td><td style="color:#f0f6fc;">MSTR</td><td><span style="color:#8b949e;font-weight:600">WAIT</span></td><td style="text-align:right">$123.00</td><td style="text-align:right;color:#3fb950">+0.0%</td><td style="text-align:right;color:#f85149">-8.8%</td><td style="text-align:right;color:#f85149">-24.6%</td><td style="text-align:center">36</td><td><div style="display:flex;align-items:center;gap:4px;min-width:80px"><span style="color:#d29922;font-weight:700;min-width:24px">7</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden"><div style="height:100%;width:7%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#d29922;font-size:0.85em">재진입 멀음</td></tr><tr style="opacity:0.55;"><td style="text-align:center;color:#484f58">15</td><td style="color:#f0f6fc;">QBTS</td><td><span style="color:#8b949e;font-weight:600">WAIT</span></td><td style="text-align:right">$18.82</td><td style="text-align:right;color:#3fb950">+0.0%</td><td style="text-align:right;color:#f85149">-9.2%</td><td style="text-align:right;color:#f85149">-26.6%</td><td style="text-align:center">34</td><td><div style="display:flex;align-items:center;gap:4px;min-width:80px"><span style="color:#d29922;font-weight:700;min-width:24px">7</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden"><div style="height:100%;width:7%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#d29922;font-size:0.85em">재진입 멀음</td></tr><tr style="opacity:0.55;"><td style="text-align:center;color:#484f58">16</td><td style="color:#f0f6fc;">SMR</td><td><span style="color:#8b949e;font-weight:600">WAIT</span></td><td style="text-align:right">$13.99</td><td style="text-align:right;color:#3fb950">+0.0%</td><td style="text-align:right;color:#f85149">-20.2%</td><td style="text-align:right;color:#f85149">-29.2%</td><td style="text-align:center">35</td><td><div style="display:flex;align-items:center;gap:4px;min-width:80px"><span style="color:#d29922;font-weight:700;min-width:24px">7</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden"><div style="height:100%;width:7%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#d29922;font-size:0.85em">재진입 멀음</td></tr><tr style="opacity:0.55;"><td style="text-align:center;color:#484f58">17</td><td style="color:#f0f6fc;">SOUN</td><td><span style="color:#8b949e;font-weight:600">WAIT</span></td><td style="text-align:right">$7.46</td><td style="text-align:right;color:#3fb950">+0.0%</td><td style="text-align:right;color:#f85149">-12.9%</td><td style="text-align:right;color:#f85149">-27.8%</td><td style="text-align:center">30</td><td><div style="display:flex;align-items:center;gap:4px;min-width:80px"><span style="color:#d29922;font-weight:700;min-width:24px">7</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden"><div style="height:100%;width:7%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#d29922;font-size:0.85em">재진입 멀음</td></tr><tr style="opacity:0.55;"><td style="text-align:center;color:#484f58">18</td><td style="color:#f0f6fc;">BBAI</td><td><span style="color:#8b949e;font-weight:600">WAIT</span></td><td style="text-align:right">$4.10</td><td style="text-align:right;color:#3fb950">+0.0%</td><td style="text-align:right;color:#f85149">-13.1%</td><td style="text-align:right;color:#f85149">-29.6%</td><td style="text-align:center">32</td><td><div style="display:flex;align-items:center;gap:4px;min-width:80px"><span style="color:#d29922;font-weight:700;min-width:24px">7</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden"><div style="height:100%;width:7%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#d29922;font-size:0.85em">재진입 멀음</td></tr><tr style="opacity:0.55;"><td style="text-align:center;color:#484f58">19</td><td style="color:#f0f6fc;">ASTS</td><td><span style="color:#8b949e;font-weight:600">WAIT</span></td><td style="text-align:right">$82.22</td><td style="text-align:right;color:#3fb950">+0.0%</td><td style="text-align:right;color:#f85149">-19.2%</td><td style="text-align:right;color:#f85149">-27.6%</td><td style="text-align:center">36</td><td><div style="display:flex;align-items:center;gap:4px;min-width:80px"><span style="color:#d29922;font-weight:700;min-width:24px">7</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden"><div style="height:100%;width:7%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#d29922;font-size:0.85em">재진입 멀음</td></tr><tr style="opacity:0.55;"><td style="text-align:center;color:#484f58">20</td><td style="color:#f0f6fc;">RCAT</td><td><span style="color:#8b949e;font-weight:600">WAIT</span></td><td style="text-align:right">$11.25</td><td style="text-align:right;color:#3fb950">+0.0%</td><td style="text-align:right;color:#f85149">-10.9%</td><td style="text-align:right;color:#f85149">-30.0%</td><td style="text-align:center">41</td><td><div style="display:flex;align-items:center;gap:4px;min-width:80px"><span style="color:#d29922;font-weight:700;min-width:24px">4</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden"><div style="height:100%;width:4%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#d29922;font-size:0.85em">재진입 멀음</td></tr><tr style="opacity:0.55;"><td style="text-align:center;color:#484f58">21</td><td style="color:#f0f6fc;">NTLA</td><td><span style="color:#8b949e;font-weight:600">WAIT</span></td><td style="text-align:right">$11.62</td><td style="text-align:right;color:#3fb950">+0.0%</td><td style="text-align:right;color:#f85149">-5.4%</td><td style="text-align:right;color:#f85149">-20.6%</td><td style="text-align:center">42</td><td><div style="display:flex;align-items:center;gap:4px;min-width:80px"><span style="color:#d29922;font-weight:700;min-width:24px">4</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden"><div style="height:100%;width:4%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#d29922;font-size:0.85em">재진입 멀음</td></tr><tr style="opacity:0.55;"><td style="text-align:center;color:#484f58">22</td><td style="color:#f0f6fc;">PL</td><td><span style="color:#8b949e;font-weight:600">WAIT</span></td><td style="text-align:right">$21.30</td><td style="text-align:right;color:#3fb950">+0.0%</td><td style="text-align:right;color:#f85149">-4.3%</td><td style="text-align:right;color:#f85149">-20.9%</td><td style="text-align:center">40</td><td><div style="display:flex;align-items:center;gap:4px;min-width:80px"><span style="color:#d29922;font-weight:700;min-width:24px">4</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden"><div style="height:100%;width:4%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#d29922;font-size:0.85em">재진입 멀음</td></tr><tr style="opacity:0.55;"><td style="text-align:center;color:#484f58">23</td><td style="color:#f0f6fc;">LUNR</td><td><span style="color:#8b949e;font-weight:600">WAIT</span></td><td style="text-align:right">$15.72</td><td style="text-align:right;color:#3fb950">+0.0%</td><td style="text-align:right;color:#f85149">-10.3%</td><td style="text-align:right;color:#f85149">-21.5%</td><td style="text-align:center">42</td><td><div style="display:flex;align-items:center;gap:4px;min-width:80px"><span style="color:#d29922;font-weight:700;min-width:24px">4</span><div style="flex:1;height:4px;background:#21262d;border-radius:2px;overflow:hidden"><div style="height:100%;width:4%;background:#d29922;border-radius:2px"></div></div></div></td><td style="color:#d29922;font-size:0.85em">재진입 멀음</td></tr></tbody>
+      </table>
+    </div>
+
+
+<div class="signals-grid">
+
+        <div class="card signal-card" style="border-left:3px solid #3fb950">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:700;color:#f0f6fc">APLD</span>
+            <span style="background:#1a3a1a;color:#3fb950;border:1px solid #238636;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:600">HOLD</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span style="font-size:1.3em;font-weight:700;color:#f0f6fc">$36.17</span>
+            <span style="color:#3fb950;font-size:0.85em;margin-left:6px">+0.0%</span>
+          </div>
+          <div class="details">
+            <div class="row"><span class="lab">P&L</span><span style="color:#f85149;font-weight:600">-5.6%</span></div>
+            <div class="row"><span class="lab">Entry</span><span>$38.33</span></div>
+
+        <div class="row"><span class="lab">RSI</span><span>52</span></div>
+        <div class="row"><span class="lab">1W / 1M</span><span>
+          <span style="color:#3fb950">+3.5%</span> /
+          <span style="color:#f85149">-4.0%</span>
+        </span></div>
+        <div class="row" style="margin-top:4px;padding-top:4px;border-top:1px solid #21262d">
+          <span class="lab">Score</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:2px solid #3fb950;color:#3fb950;font-size:0.9em;font-weight:700">48</span>
+            <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="height:4px;background:#21262d;border-radius:2px;overflow:hidden"><span style="display:block;height:100%;width:48%;background:#3fb950;border-radius:2px"></span></span>
+              <span style="color:#3fb950;font-size:0.78em">양호</span>
+            </span>
+          </span>
+        </div>
+        </div>
+          <div style="margin-top:10px"><canvas id="chart-APLD" height="100"></canvas></div>
+        </div>
+
+        <div class="card signal-card" style="border-left:3px solid #30363d">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:700;color:#f0f6fc">SMCI</span>
+            <span style="background:#1a1d21;color:#8b949e;border:1px solid #30363d;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:600">WAIT</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span style="font-size:1.3em;font-weight:700;color:#f0f6fc">$30.43</span>
+            <span style="color:#3fb950;font-size:0.85em;margin-left:6px">+0.0%</span>
+          </div>
+          <div class="details">
+            <div class="row"><span class="lab">Status</span><span style="color:#d29922">재진입 대기</span></div>
+
+        <div class="row"><span class="lab">RSI</span><span>45</span></div>
+        <div class="row"><span class="lab">1W / 1M</span><span>
+          <span style="color:#f85149">-11.5%</span> /
+          <span style="color:#f85149">-4.0%</span>
+        </span></div>
+        <div class="row" style="margin-top:4px;padding-top:4px;border-top:1px solid #21262d">
+          <span class="lab">Score</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:2px solid #d29922;color:#d29922;font-size:0.9em;font-weight:700">32</span>
+            <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="height:4px;background:#21262d;border-radius:2px;overflow:hidden"><span style="display:block;height:100%;width:32%;background:#d29922;border-radius:2px"></span></span>
+              <span style="color:#d29922;font-size:0.78em">대기</span>
+            </span>
+          </span>
+        </div>
+        </div>
+          <div style="margin-top:10px"><canvas id="chart-SMCI" height="100"></canvas></div>
+        </div>
+
+        <div class="card signal-card" style="border-left:3px solid #30363d">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:700;color:#f0f6fc">IONQ</span>
+            <span style="background:#1a1d21;color:#8b949e;border:1px solid #30363d;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:600">WAIT</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span style="font-size:1.3em;font-weight:700;color:#f0f6fc">$31.30</span>
+            <span style="color:#3fb950;font-size:0.85em;margin-left:6px">+0.0%</span>
+          </div>
+          <div class="details">
+            <div class="row"><span class="lab">Status</span><span style="color:#d29922">재진입 대기</span></div>
+
+        <div class="row"><span class="lab">RSI</span><span>28</span></div>
+        <div class="row"><span class="lab">1W / 1M</span><span>
+          <span style="color:#f85149">-10.5%</span> /
+          <span style="color:#f85149">-33.8%</span>
+        </span></div>
+        <div class="row" style="margin-top:4px;padding-top:4px;border-top:1px solid #21262d">
+          <span class="lab">Score</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:2px solid #d29922;color:#d29922;font-size:0.9em;font-weight:700">10</span>
+            <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="height:4px;background:#21262d;border-radius:2px;overflow:hidden"><span style="display:block;height:100%;width:10%;background:#d29922;border-radius:2px"></span></span>
+              <span style="color:#d29922;font-size:0.78em">재진입 멀음</span>
+            </span>
+          </span>
+        </div>
+        </div>
+          <div style="margin-top:10px"><canvas id="chart-IONQ" height="100"></canvas></div>
+        </div>
+
+        <div class="card signal-card" style="border-left:3px solid #30363d">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:700;color:#f0f6fc">COIN</span>
+            <span style="background:#1a1d21;color:#8b949e;border:1px solid #30363d;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:600">WAIT</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span style="font-size:1.3em;font-weight:700;color:#f0f6fc">$141.09</span>
+            <span style="color:#3fb950;font-size:0.85em;margin-left:6px">+0.0%</span>
+          </div>
+          <div class="details">
+            <div class="row"><span class="lab">Status</span><span style="color:#d29922">재진입 대기</span></div>
+
+        <div class="row"><span class="lab">RSI</span><span>21</span></div>
+        <div class="row"><span class="lab">1W / 1M</span><span>
+          <span style="color:#f85149">-14.6%</span> /
+          <span style="color:#f85149">-35.0%</span>
+        </span></div>
+        <div class="row" style="margin-top:4px;padding-top:4px;border-top:1px solid #21262d">
+          <span class="lab">Score</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:2px solid #d29922;color:#d29922;font-size:0.9em;font-weight:700">10</span>
+            <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="height:4px;background:#21262d;border-radius:2px;overflow:hidden"><span style="display:block;height:100%;width:10%;background:#d29922;border-radius:2px"></span></span>
+              <span style="color:#d29922;font-size:0.78em">재진입 멀음</span>
+            </span>
+          </span>
+        </div>
+        </div>
+          <div style="margin-top:10px"><canvas id="chart-COIN" height="100"></canvas></div>
+        </div>
+
+        <div class="card signal-card" style="border-left:3px solid #30363d">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:700;color:#f0f6fc">AFRM</span>
+            <span style="background:#1a1d21;color:#8b949e;border:1px solid #30363d;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:600">WAIT</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span style="font-size:1.3em;font-weight:700;color:#f0f6fc">$49.76</span>
+            <span style="color:#3fb950;font-size:0.85em;margin-left:6px">+0.0%</span>
+          </div>
+          <div class="details">
+            <div class="row"><span class="lab">Status</span><span style="color:#d29922">재진입 대기</span></div>
+
+        <div class="row"><span class="lab">RSI</span><span>20</span></div>
+        <div class="row"><span class="lab">1W / 1M</span><span>
+          <span style="color:#f85149">-12.7%</span> /
+          <span style="color:#f85149">-30.3%</span>
+        </span></div>
+        <div class="row" style="margin-top:4px;padding-top:4px;border-top:1px solid #21262d">
+          <span class="lab">Score</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:2px solid #d29922;color:#d29922;font-size:0.9em;font-weight:700">10</span>
+            <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="height:4px;background:#21262d;border-radius:2px;overflow:hidden"><span style="display:block;height:100%;width:10%;background:#d29922;border-radius:2px"></span></span>
+              <span style="color:#d29922;font-size:0.78em">재진입 멀음</span>
+            </span>
+          </span>
+        </div>
+        </div>
+          <div style="margin-top:10px"><canvas id="chart-AFRM" height="100"></canvas></div>
+        </div>
+
+        <div class="card signal-card" style="border-left:3px solid #30363d">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:700;color:#f0f6fc">HOOD</span>
+            <span style="background:#1a1d21;color:#8b949e;border:1px solid #30363d;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:600">WAIT</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span style="font-size:1.3em;font-weight:700;color:#f0f6fc">$71.12</span>
+            <span style="color:#3fb950;font-size:0.85em;margin-left:6px">+0.0%</span>
+          </div>
+          <div class="details">
+            <div class="row"><span class="lab">Status</span><span style="color:#d29922">재진입 대기</span></div>
+
+        <div class="row"><span class="lab">RSI</span><span>24</span></div>
+        <div class="row"><span class="lab">1W / 1M</span><span>
+          <span style="color:#f85149">-14.1%</span> /
+          <span style="color:#f85149">-33.5%</span>
+        </span></div>
+        <div class="row" style="margin-top:4px;padding-top:4px;border-top:1px solid #21262d">
+          <span class="lab">Score</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:2px solid #d29922;color:#d29922;font-size:0.9em;font-weight:700">10</span>
+            <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="height:4px;background:#21262d;border-radius:2px;overflow:hidden"><span style="display:block;height:100%;width:10%;background:#d29922;border-radius:2px"></span></span>
+              <span style="color:#d29922;font-size:0.78em">재진입 멀음</span>
+            </span>
+          </span>
+        </div>
+        </div>
+          <div style="margin-top:10px"><canvas id="chart-HOOD" height="100"></canvas></div>
+        </div>
+
+        <div class="card signal-card" style="border-left:3px solid #30363d">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:700;color:#f0f6fc">SOFI</span>
+            <span style="background:#1a1d21;color:#8b949e;border:1px solid #30363d;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:600">WAIT</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span style="font-size:1.3em;font-weight:700;color:#f0f6fc">$19.30</span>
+            <span style="color:#3fb950;font-size:0.85em;margin-left:6px">+0.0%</span>
+          </div>
+          <div class="details">
+            <div class="row"><span class="lab">Status</span><span style="color:#d29922">재진입 대기</span></div>
+
+        <div class="row"><span class="lab">RSI</span><span>24</span></div>
+        <div class="row"><span class="lab">1W / 1M</span><span>
+          <span style="color:#f85149">-7.5%</span> /
+          <span style="color:#f85149">-25.3%</span>
+        </span></div>
+        <div class="row" style="margin-top:4px;padding-top:4px;border-top:1px solid #21262d">
+          <span class="lab">Score</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:2px solid #d29922;color:#d29922;font-size:0.9em;font-weight:700">10</span>
+            <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="height:4px;background:#21262d;border-radius:2px;overflow:hidden"><span style="display:block;height:100%;width:10%;background:#d29922;border-radius:2px"></span></span>
+              <span style="color:#d29922;font-size:0.78em">재진입 멀음</span>
+            </span>
+          </span>
+        </div>
+        </div>
+          <div style="margin-top:10px"><canvas id="chart-SOFI" height="100"></canvas></div>
+        </div>
+
+        <div class="card signal-card" style="border-left:3px solid #30363d">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:700;color:#f0f6fc">RGTI</span>
+            <span style="background:#1a1d21;color:#8b949e;border:1px solid #30363d;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:600">WAIT</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span style="font-size:1.3em;font-weight:700;color:#f0f6fc">$14.99</span>
+            <span style="color:#3fb950;font-size:0.85em;margin-left:6px">+0.0%</span>
+          </div>
+          <div class="details">
+            <div class="row"><span class="lab">Status</span><span style="color:#d29922">재진입 대기</span></div>
+
+        <div class="row"><span class="lab">RSI</span><span>28</span></div>
+        <div class="row"><span class="lab">1W / 1M</span><span>
+          <span style="color:#f85149">-15.4%</span> /
+          <span style="color:#f85149">-36.1%</span>
+        </span></div>
+        <div class="row" style="margin-top:4px;padding-top:4px;border-top:1px solid #21262d">
+          <span class="lab">Score</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:2px solid #d29922;color:#d29922;font-size:0.9em;font-weight:700">10</span>
+            <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="height:4px;background:#21262d;border-radius:2px;overflow:hidden"><span style="display:block;height:100%;width:10%;background:#d29922;border-radius:2px"></span></span>
+              <span style="color:#d29922;font-size:0.78em">재진입 멀음</span>
+            </span>
+          </span>
+        </div>
+        </div>
+          <div style="margin-top:10px"><canvas id="chart-RGTI" height="100"></canvas></div>
+        </div>
+
+        <div class="card signal-card" style="border-left:3px solid #30363d">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:700;color:#f0f6fc">FNGU</span>
+            <span style="background:#1a1d21;color:#8b949e;border:1px solid #30363d;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:600">WAIT</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span style="font-size:1.3em;font-weight:700;color:#f0f6fc">$17.87</span>
+            <span style="color:#3fb950;font-size:0.85em;margin-left:6px">+0.0%</span>
+          </div>
+          <div class="details">
+            <div class="row"><span class="lab">Status</span><span style="color:#d29922">재진입 대기</span></div>
+
+        <div class="row"><span class="lab">RSI</span><span>27</span></div>
+        <div class="row"><span class="lab">1W / 1M</span><span>
+          <span style="color:#f85149">-7.6%</span> /
+          <span style="color:#f85149">-21.8%</span>
+        </span></div>
+        <div class="row" style="margin-top:4px;padding-top:4px;border-top:1px solid #21262d">
+          <span class="lab">Score</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:2px solid #d29922;color:#d29922;font-size:0.9em;font-weight:700">10</span>
+            <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="height:4px;background:#21262d;border-radius:2px;overflow:hidden"><span style="display:block;height:100%;width:10%;background:#d29922;border-radius:2px"></span></span>
+              <span style="color:#d29922;font-size:0.78em">재진입 멀음</span>
+            </span>
+          </span>
+        </div>
+        </div>
+          <div style="margin-top:10px"><canvas id="chart-FNGU" height="100"></canvas></div>
+        </div>
+
+        <div class="card signal-card" style="border-left:3px solid #30363d">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:700;color:#f0f6fc">ACHR</span>
+            <span style="background:#1a1d21;color:#8b949e;border:1px solid #30363d;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:600">WAIT</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span style="font-size:1.3em;font-weight:700;color:#f0f6fc">$6.76</span>
+            <span style="color:#3fb950;font-size:0.85em;margin-left:6px">+0.0%</span>
+          </div>
+          <div class="details">
+            <div class="row"><span class="lab">Status</span><span style="color:#d29922">재진입 대기</span></div>
+
+        <div class="row"><span class="lab">RSI</span><span>35</span></div>
+        <div class="row"><span class="lab">1W / 1M</span><span>
+          <span style="color:#f85149">-7.4%</span> /
+          <span style="color:#f85149">-21.5%</span>
+        </span></div>
+        <div class="row" style="margin-top:4px;padding-top:4px;border-top:1px solid #21262d">
+          <span class="lab">Score</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:2px solid #d29922;color:#d29922;font-size:0.9em;font-weight:700">9</span>
+            <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="height:4px;background:#21262d;border-radius:2px;overflow:hidden"><span style="display:block;height:100%;width:9%;background:#d29922;border-radius:2px"></span></span>
+              <span style="color:#d29922;font-size:0.78em">재진입 멀음</span>
+            </span>
+          </span>
+        </div>
+        </div>
+          <div style="margin-top:10px"><canvas id="chart-ACHR" height="100"></canvas></div>
+        </div>
+
+        <div class="card signal-card" style="border-left:3px solid #30363d">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:700;color:#f0f6fc">RKLB</span>
+            <span style="background:#1a1d21;color:#8b949e;border:1px solid #30363d;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:600">WAIT</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span style="font-size:1.3em;font-weight:700;color:#f0f6fc">$66.01</span>
+            <span style="color:#3fb950;font-size:0.85em;margin-left:6px">+0.0%</span>
+          </div>
+          <div class="details">
+            <div class="row"><span class="lab">Status</span><span style="color:#d29922">재진입 대기</span></div>
+
+        <div class="row"><span class="lab">RSI</span><span>37</span></div>
+        <div class="row"><span class="lab">1W / 1M</span><span>
+          <span style="color:#f85149">-8.7%</span> /
+          <span style="color:#f85149">-25.7%</span>
+        </span></div>
+        <div class="row" style="margin-top:4px;padding-top:4px;border-top:1px solid #21262d">
+          <span class="lab">Score</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:2px solid #d29922;color:#d29922;font-size:0.9em;font-weight:700">7</span>
+            <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="height:4px;background:#21262d;border-radius:2px;overflow:hidden"><span style="display:block;height:100%;width:7%;background:#d29922;border-radius:2px"></span></span>
+              <span style="color:#d29922;font-size:0.78em">재진입 멀음</span>
+            </span>
+          </span>
+        </div>
+        </div>
+          <div style="margin-top:10px"><canvas id="chart-RKLB" height="100"></canvas></div>
+        </div>
+
+        <div class="card signal-card" style="border-left:3px solid #30363d">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:700;color:#f0f6fc">IREN</span>
+            <span style="background:#1a1d21;color:#8b949e;border:1px solid #30363d;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:600">WAIT</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span style="font-size:1.3em;font-weight:700;color:#f0f6fc">$40.03</span>
+            <span style="color:#3fb950;font-size:0.85em;margin-left:6px">+0.0%</span>
+          </div>
+          <div class="details">
+            <div class="row"><span class="lab">Status</span><span style="color:#d29922">재진입 대기</span></div>
+
+        <div class="row"><span class="lab">RSI</span><span>37</span></div>
+        <div class="row"><span class="lab">1W / 1M</span><span>
+          <span style="color:#f85149">-4.3%</span> /
+          <span style="color:#f85149">-29.4%</span>
+        </span></div>
+        <div class="row" style="margin-top:4px;padding-top:4px;border-top:1px solid #21262d">
+          <span class="lab">Score</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:2px solid #d29922;color:#d29922;font-size:0.9em;font-weight:700">7</span>
+            <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="height:4px;background:#21262d;border-radius:2px;overflow:hidden"><span style="display:block;height:100%;width:7%;background:#d29922;border-radius:2px"></span></span>
+              <span style="color:#d29922;font-size:0.78em">재진입 멀음</span>
+            </span>
+          </span>
+        </div>
+        </div>
+          <div style="margin-top:10px"><canvas id="chart-IREN" height="100"></canvas></div>
+        </div>
+
+        <div class="card signal-card" style="border-left:3px solid #30363d">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:700;color:#f0f6fc">PLTR</span>
+            <span style="background:#1a1d21;color:#8b949e;border:1px solid #30363d;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:600">WAIT</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span style="font-size:1.3em;font-weight:700;color:#f0f6fc">$129.13</span>
+            <span style="color:#3fb950;font-size:0.85em;margin-left:6px">+0.0%</span>
+          </div>
+          <div class="details">
+            <div class="row"><span class="lab">Status</span><span style="color:#d29922">재진입 대기</span></div>
+
+        <div class="row"><span class="lab">RSI</span><span>30</span></div>
+        <div class="row"><span class="lab">1W / 1M</span><span>
+          <span style="color:#f85149">-5.0%</span> /
+          <span style="color:#f85149">-23.9%</span>
+        </span></div>
+        <div class="row" style="margin-top:4px;padding-top:4px;border-top:1px solid #21262d">
+          <span class="lab">Score</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:2px solid #d29922;color:#d29922;font-size:0.9em;font-weight:700">7</span>
+            <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="height:4px;background:#21262d;border-radius:2px;overflow:hidden"><span style="display:block;height:100%;width:7%;background:#d29922;border-radius:2px"></span></span>
+              <span style="color:#d29922;font-size:0.78em">재진입 멀음</span>
+            </span>
+          </span>
+        </div>
+        </div>
+          <div style="margin-top:10px"><canvas id="chart-PLTR" height="100"></canvas></div>
+        </div>
+
+        <div class="card signal-card" style="border-left:3px solid #30363d">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:700;color:#f0f6fc">MSTR</span>
+            <span style="background:#1a1d21;color:#8b949e;border:1px solid #30363d;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:600">WAIT</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span style="font-size:1.3em;font-weight:700;color:#f0f6fc">$123.00</span>
+            <span style="color:#3fb950;font-size:0.85em;margin-left:6px">+0.0%</span>
+          </div>
+          <div class="details">
+            <div class="row"><span class="lab">Status</span><span style="color:#d29922">재진입 대기</span></div>
+
+        <div class="row"><span class="lab">RSI</span><span>36</span></div>
+        <div class="row"><span class="lab">1W / 1M</span><span>
+          <span style="color:#f85149">-8.8%</span> /
+          <span style="color:#f85149">-24.6%</span>
+        </span></div>
+        <div class="row" style="margin-top:4px;padding-top:4px;border-top:1px solid #21262d">
+          <span class="lab">Score</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:2px solid #d29922;color:#d29922;font-size:0.9em;font-weight:700">7</span>
+            <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="height:4px;background:#21262d;border-radius:2px;overflow:hidden"><span style="display:block;height:100%;width:7%;background:#d29922;border-radius:2px"></span></span>
+              <span style="color:#d29922;font-size:0.78em">재진입 멀음</span>
+            </span>
+          </span>
+        </div>
+        </div>
+          <div style="margin-top:10px"><canvas id="chart-MSTR" height="100"></canvas></div>
+        </div>
+
+        <div class="card signal-card" style="border-left:3px solid #30363d">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:700;color:#f0f6fc">QBTS</span>
+            <span style="background:#1a1d21;color:#8b949e;border:1px solid #30363d;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:600">WAIT</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span style="font-size:1.3em;font-weight:700;color:#f0f6fc">$18.82</span>
+            <span style="color:#3fb950;font-size:0.85em;margin-left:6px">+0.0%</span>
+          </div>
+          <div class="details">
+            <div class="row"><span class="lab">Status</span><span style="color:#d29922">재진입 대기</span></div>
+
+        <div class="row"><span class="lab">RSI</span><span>34</span></div>
+        <div class="row"><span class="lab">1W / 1M</span><span>
+          <span style="color:#f85149">-9.2%</span> /
+          <span style="color:#f85149">-26.6%</span>
+        </span></div>
+        <div class="row" style="margin-top:4px;padding-top:4px;border-top:1px solid #21262d">
+          <span class="lab">Score</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:2px solid #d29922;color:#d29922;font-size:0.9em;font-weight:700">7</span>
+            <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="height:4px;background:#21262d;border-radius:2px;overflow:hidden"><span style="display:block;height:100%;width:7%;background:#d29922;border-radius:2px"></span></span>
+              <span style="color:#d29922;font-size:0.78em">재진입 멀음</span>
+            </span>
+          </span>
+        </div>
+        </div>
+          <div style="margin-top:10px"><canvas id="chart-QBTS" height="100"></canvas></div>
+        </div>
+
+        <div class="card signal-card" style="border-left:3px solid #30363d">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:700;color:#f0f6fc">SMR</span>
+            <span style="background:#1a1d21;color:#8b949e;border:1px solid #30363d;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:600">WAIT</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span style="font-size:1.3em;font-weight:700;color:#f0f6fc">$13.99</span>
+            <span style="color:#3fb950;font-size:0.85em;margin-left:6px">+0.0%</span>
+          </div>
+          <div class="details">
+            <div class="row"><span class="lab">Status</span><span style="color:#d29922">재진입 대기</span></div>
+
+        <div class="row"><span class="lab">RSI</span><span>35</span></div>
+        <div class="row"><span class="lab">1W / 1M</span><span>
+          <span style="color:#f85149">-20.2%</span> /
+          <span style="color:#f85149">-29.2%</span>
+        </span></div>
+        <div class="row" style="margin-top:4px;padding-top:4px;border-top:1px solid #21262d">
+          <span class="lab">Score</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:2px solid #d29922;color:#d29922;font-size:0.9em;font-weight:700">7</span>
+            <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="height:4px;background:#21262d;border-radius:2px;overflow:hidden"><span style="display:block;height:100%;width:7%;background:#d29922;border-radius:2px"></span></span>
+              <span style="color:#d29922;font-size:0.78em">재진입 멀음</span>
+            </span>
+          </span>
+        </div>
+        </div>
+          <div style="margin-top:10px"><canvas id="chart-SMR" height="100"></canvas></div>
+        </div>
+
+        <div class="card signal-card" style="border-left:3px solid #30363d">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:700;color:#f0f6fc">SOUN</span>
+            <span style="background:#1a1d21;color:#8b949e;border:1px solid #30363d;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:600">WAIT</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span style="font-size:1.3em;font-weight:700;color:#f0f6fc">$7.46</span>
+            <span style="color:#3fb950;font-size:0.85em;margin-left:6px">+0.0%</span>
+          </div>
+          <div class="details">
+            <div class="row"><span class="lab">Status</span><span style="color:#d29922">재진입 대기</span></div>
+
+        <div class="row"><span class="lab">RSI</span><span>30</span></div>
+        <div class="row"><span class="lab">1W / 1M</span><span>
+          <span style="color:#f85149">-12.9%</span> /
+          <span style="color:#f85149">-27.8%</span>
+        </span></div>
+        <div class="row" style="margin-top:4px;padding-top:4px;border-top:1px solid #21262d">
+          <span class="lab">Score</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:2px solid #d29922;color:#d29922;font-size:0.9em;font-weight:700">7</span>
+            <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="height:4px;background:#21262d;border-radius:2px;overflow:hidden"><span style="display:block;height:100%;width:7%;background:#d29922;border-radius:2px"></span></span>
+              <span style="color:#d29922;font-size:0.78em">재진입 멀음</span>
+            </span>
+          </span>
+        </div>
+        </div>
+          <div style="margin-top:10px"><canvas id="chart-SOUN" height="100"></canvas></div>
+        </div>
+
+        <div class="card signal-card" style="border-left:3px solid #30363d">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:700;color:#f0f6fc">BBAI</span>
+            <span style="background:#1a1d21;color:#8b949e;border:1px solid #30363d;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:600">WAIT</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span style="font-size:1.3em;font-weight:700;color:#f0f6fc">$4.10</span>
+            <span style="color:#3fb950;font-size:0.85em;margin-left:6px">+0.0%</span>
+          </div>
+          <div class="details">
+            <div class="row"><span class="lab">Status</span><span style="color:#d29922">재진입 대기</span></div>
+
+        <div class="row"><span class="lab">RSI</span><span>32</span></div>
+        <div class="row"><span class="lab">1W / 1M</span><span>
+          <span style="color:#f85149">-13.1%</span> /
+          <span style="color:#f85149">-29.6%</span>
+        </span></div>
+        <div class="row" style="margin-top:4px;padding-top:4px;border-top:1px solid #21262d">
+          <span class="lab">Score</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:2px solid #d29922;color:#d29922;font-size:0.9em;font-weight:700">7</span>
+            <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="height:4px;background:#21262d;border-radius:2px;overflow:hidden"><span style="display:block;height:100%;width:7%;background:#d29922;border-radius:2px"></span></span>
+              <span style="color:#d29922;font-size:0.78em">재진입 멀음</span>
+            </span>
+          </span>
+        </div>
+        </div>
+          <div style="margin-top:10px"><canvas id="chart-BBAI" height="100"></canvas></div>
+        </div>
+
+        <div class="card signal-card" style="border-left:3px solid #30363d">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:700;color:#f0f6fc">ASTS</span>
+            <span style="background:#1a1d21;color:#8b949e;border:1px solid #30363d;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:600">WAIT</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span style="font-size:1.3em;font-weight:700;color:#f0f6fc">$82.22</span>
+            <span style="color:#3fb950;font-size:0.85em;margin-left:6px">+0.0%</span>
+          </div>
+          <div class="details">
+            <div class="row"><span class="lab">Status</span><span style="color:#d29922">재진입 대기</span></div>
+
+        <div class="row"><span class="lab">RSI</span><span>36</span></div>
+        <div class="row"><span class="lab">1W / 1M</span><span>
+          <span style="color:#f85149">-19.2%</span> /
+          <span style="color:#f85149">-27.6%</span>
+        </span></div>
+        <div class="row" style="margin-top:4px;padding-top:4px;border-top:1px solid #21262d">
+          <span class="lab">Score</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:2px solid #d29922;color:#d29922;font-size:0.9em;font-weight:700">7</span>
+            <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="height:4px;background:#21262d;border-radius:2px;overflow:hidden"><span style="display:block;height:100%;width:7%;background:#d29922;border-radius:2px"></span></span>
+              <span style="color:#d29922;font-size:0.78em">재진입 멀음</span>
+            </span>
+          </span>
+        </div>
+        </div>
+          <div style="margin-top:10px"><canvas id="chart-ASTS" height="100"></canvas></div>
+        </div>
+
+        <div class="card signal-card" style="border-left:3px solid #30363d">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:700;color:#f0f6fc">RCAT</span>
+            <span style="background:#1a1d21;color:#8b949e;border:1px solid #30363d;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:600">WAIT</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span style="font-size:1.3em;font-weight:700;color:#f0f6fc">$11.25</span>
+            <span style="color:#3fb950;font-size:0.85em;margin-left:6px">+0.0%</span>
+          </div>
+          <div class="details">
+            <div class="row"><span class="lab">Status</span><span style="color:#d29922">재진입 대기</span></div>
+
+        <div class="row"><span class="lab">RSI</span><span>41</span></div>
+        <div class="row"><span class="lab">1W / 1M</span><span>
+          <span style="color:#f85149">-10.9%</span> /
+          <span style="color:#f85149">-30.0%</span>
+        </span></div>
+        <div class="row" style="margin-top:4px;padding-top:4px;border-top:1px solid #21262d">
+          <span class="lab">Score</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:2px solid #d29922;color:#d29922;font-size:0.9em;font-weight:700">4</span>
+            <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="height:4px;background:#21262d;border-radius:2px;overflow:hidden"><span style="display:block;height:100%;width:4%;background:#d29922;border-radius:2px"></span></span>
+              <span style="color:#d29922;font-size:0.78em">재진입 멀음</span>
+            </span>
+          </span>
+        </div>
+        </div>
+          <div style="margin-top:10px"><canvas id="chart-RCAT" height="100"></canvas></div>
+        </div>
+
+        <div class="card signal-card" style="border-left:3px solid #30363d">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:700;color:#f0f6fc">NTLA</span>
+            <span style="background:#1a1d21;color:#8b949e;border:1px solid #30363d;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:600">WAIT</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span style="font-size:1.3em;font-weight:700;color:#f0f6fc">$11.62</span>
+            <span style="color:#3fb950;font-size:0.85em;margin-left:6px">+0.0%</span>
+          </div>
+          <div class="details">
+            <div class="row"><span class="lab">Status</span><span style="color:#d29922">재진입 대기</span></div>
+
+        <div class="row"><span class="lab">RSI</span><span>42</span></div>
+        <div class="row"><span class="lab">1W / 1M</span><span>
+          <span style="color:#f85149">-5.4%</span> /
+          <span style="color:#f85149">-20.6%</span>
+        </span></div>
+        <div class="row" style="margin-top:4px;padding-top:4px;border-top:1px solid #21262d">
+          <span class="lab">Score</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:2px solid #d29922;color:#d29922;font-size:0.9em;font-weight:700">4</span>
+            <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="height:4px;background:#21262d;border-radius:2px;overflow:hidden"><span style="display:block;height:100%;width:4%;background:#d29922;border-radius:2px"></span></span>
+              <span style="color:#d29922;font-size:0.78em">재진입 멀음</span>
+            </span>
+          </span>
+        </div>
+        </div>
+          <div style="margin-top:10px"><canvas id="chart-NTLA" height="100"></canvas></div>
+        </div>
+
+        <div class="card signal-card" style="border-left:3px solid #30363d">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:700;color:#f0f6fc">PL</span>
+            <span style="background:#1a1d21;color:#8b949e;border:1px solid #30363d;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:600">WAIT</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span style="font-size:1.3em;font-weight:700;color:#f0f6fc">$21.30</span>
+            <span style="color:#3fb950;font-size:0.85em;margin-left:6px">+0.0%</span>
+          </div>
+          <div class="details">
+            <div class="row"><span class="lab">Status</span><span style="color:#d29922">재진입 대기</span></div>
+
+        <div class="row"><span class="lab">RSI</span><span>40</span></div>
+        <div class="row"><span class="lab">1W / 1M</span><span>
+          <span style="color:#f85149">-4.3%</span> /
+          <span style="color:#f85149">-20.9%</span>
+        </span></div>
+        <div class="row" style="margin-top:4px;padding-top:4px;border-top:1px solid #21262d">
+          <span class="lab">Score</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:2px solid #d29922;color:#d29922;font-size:0.9em;font-weight:700">4</span>
+            <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="height:4px;background:#21262d;border-radius:2px;overflow:hidden"><span style="display:block;height:100%;width:4%;background:#d29922;border-radius:2px"></span></span>
+              <span style="color:#d29922;font-size:0.78em">재진입 멀음</span>
+            </span>
+          </span>
+        </div>
+        </div>
+          <div style="margin-top:10px"><canvas id="chart-PL" height="100"></canvas></div>
+        </div>
+
+        <div class="card signal-card" style="border-left:3px solid #30363d">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:700;color:#f0f6fc">LUNR</span>
+            <span style="background:#1a1d21;color:#8b949e;border:1px solid #30363d;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:600">WAIT</span>
+          </div>
+          <div style="margin-bottom:8px">
+            <span style="font-size:1.3em;font-weight:700;color:#f0f6fc">$15.72</span>
+            <span style="color:#3fb950;font-size:0.85em;margin-left:6px">+0.0%</span>
+          </div>
+          <div class="details">
+            <div class="row"><span class="lab">Status</span><span style="color:#d29922">재진입 대기</span></div>
+
+        <div class="row"><span class="lab">RSI</span><span>42</span></div>
+        <div class="row"><span class="lab">1W / 1M</span><span>
+          <span style="color:#f85149">-10.3%</span> /
+          <span style="color:#f85149">-21.5%</span>
+        </span></div>
+        <div class="row" style="margin-top:4px;padding-top:4px;border-top:1px solid #21262d">
+          <span class="lab">Score</span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:2px solid #d29922;color:#d29922;font-size:0.9em;font-weight:700">4</span>
+            <span style="flex:1;display:flex;flex-direction:column;gap:2px">
+              <span style="height:4px;background:#21262d;border-radius:2px;overflow:hidden"><span style="display:block;height:100%;width:4%;background:#d29922;border-radius:2px"></span></span>
+              <span style="color:#d29922;font-size:0.78em">재진입 멀음</span>
+            </span>
+          </span>
+        </div>
+        </div>
+          <div style="margin-top:10px"><canvas id="chart-LUNR" height="100"></canvas></div>
+        </div>
+
+</div>
+
+</div>
+
+<div class="footer">
+  Trading Bot &middot; 24 Tickers &middot; Auto-updated every 5 min
+</div>
+
+</div>
+
+<script>
+const chartData = {"IONQ": {"dates": ["11/15", "11/16", "11/17", "11/18", "11/19", "11/20", "11/21", "11/22", "11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29", "11/30", "12/01", "12/02", "12/03", "12/04", "12/05", "12/06", "12/07", "12/08", "12/09", "12/10", "12/11", "12/12", "12/13", "12/14", "12/15", "12/16", "12/17", "12/18", "12/19", "12/20", "12/21", "12/22", "12/23", "12/24", "12/25", "12/26", "12/27", "12/28", "12/29", "12/30", "12/31", "01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07", "01/08", "01/09", "01/10", "01/11", "01/12", "01/13", "01/14", "01/15", "01/16", "01/17", "01/18", "01/19", "01/20", "01/21", "01/22", "01/23", "01/24", "01/25", "01/26", "01/27", "01/28", "01/29", "01/30", "01/31", "02/01", "02/02", "02/03", "02/04", "02/05", "02/06", "02/07", "02/08", "02/09", "02/10", "02/11", "02/12"], "prices": [47.18, 47.18, 47.79, 49.12, 47.88, 41.0, 41.71, 41.71, 41.71, 46.76, 47.06, 46.9, 46.9, 49.3, 49.3, 49.3, 47.12, 46.93, 48.65, 54.76, 52.69, 52.69, 52.69, 54.36, 54.44, 51.67, 52.55, 50.35, 50.35, 50.35, 46.07, 49.67, 45.85, 46.44, 48.48, 48.48, 48.48, 53.86, 51.39, 49.82, 49.82, 46.0, 46.0, 46.0, 45.25, 45.31, 44.87, 44.87, 46.77, 46.77, 46.77, 48.71, 50.76, 49.78, 50.45, 49.45, 49.45, 49.45, 50.95, 48.94, 50.88, 47.56, 50.8, 50.8, 50.8, 50.8, 50.66, 48.33, 49.33, 47.25, 47.25, 47.25, 43.37, 45.49, 45.8, 43.24, 39.98, 39.98, 39.98, 38.56, 38.47, 35.34, 30.43, 34.99, 34.99, 34.99, 35.48, 35.19, 33.61, 31.3], "ma20": [56.55, 55.77, 55.3, 54.7, 54.09, 53.02, 51.99, 50.95, 50.12, 49.79, 49.37, 48.84, 48.23, 47.73, 47.23, 46.93, 46.56, 46.37, 46.53, 46.91, 47.19, 47.46, 47.71, 47.97, 48.3, 48.83, 49.37, 49.81, 50.24, 50.42, 50.37, 50.51, 50.45, 50.31, 50.27, 50.23, 50.3, 50.64, 50.78, 50.53, 50.39, 50.06, 49.72, 49.3, 48.84, 48.53, 48.14, 47.87, 47.69, 47.51, 47.54, 47.5, 47.74, 47.91, 48.01, 48.06, 48.1, 47.88, 47.86, 47.82, 47.87, 47.95, 48.19, 48.43, 48.71, 48.98, 49.27, 49.44, 49.57, 49.6, 49.62, 49.55, 49.18, 48.96, 48.73, 48.42, 47.95, 47.47, 46.92, 46.41, 45.79, 45.17, 44.16, 43.37, 42.57, 41.78, 41.03, 40.37, 39.58, 38.78]}, "RKLB": {"dates": ["11/15", "11/16", "11/17", "11/18", "11/19", "11/20", "11/21", "11/22", "11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29", "11/30", "12/01", "12/02", "12/03", "12/04", "12/05", "12/06", "12/07", "12/08", "12/09", "12/10", "12/11", "12/12", "12/13", "12/14", "12/15", "12/16", "12/17", "12/18", "12/19", "12/20", "12/21", "12/22", "12/23", "12/24", "12/25", "12/26", "12/27", "12/28", "12/29", "12/30", "12/31", "01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07", "01/08", "01/09", "01/10", "01/11", "01/12", "01/13", "01/14", "01/15", "01/16", "01/17", "01/18", "01/19", "01/20", "01/21", "01/22", "01/23", "01/24", "01/25", "01/26", "01/27", "01/28", "01/29", "01/30", "01/31", "02/01", "02/02", "02/03", "02/04", "02/05", "02/06", "02/07", "02/08", "02/09", "02/10", "02/11", "02/12"], "prices": [45.54, 45.54, 43.31, 42.78, 43.62, 39.48, 40.3, 40.3, 40.3, 42.45, 42.6, 41.93, 41.93, 42.14, 42.14, 42.14, 40.37, 41.9, 44.72, 49.37, 49.06, 49.06, 49.06, 51.56, 53.43, 57.52, 63.53, 61.49, 61.49, 61.49, 55.41, 55.49, 53.96, 59.92, 70.52, 70.52, 70.52, 77.55, 77.18, 77.18, 77.18, 70.65, 70.65, 70.65, 70.12, 70.45, 69.76, 69.76, 75.99, 75.99, 75.99, 78.14, 86.03, 84.08, 83.08, 84.85, 84.85, 84.85, 87.9, 86.58, 91.8, 90.76, 96.3, 96.3, 96.3, 96.3, 89.16, 87.82, 87.98, 88.9, 88.9, 88.9, 80.48, 87.0, 88.57, 85.68, 80.07, 80.07, 80.07, 74.15, 81.27, 73.11, 66.32, 72.32, 72.32, 72.32, 75.84, 72.03, 69.62, 66.01], "ma20": [55.68, 54.68, 53.66, 52.49, 51.62, 50.45, 49.32, 48.18, 47.13, 46.42, 45.73, 45.35, 44.86, 44.39, 43.91, 43.42, 42.88, 42.48, 42.45, 42.64, 42.82, 42.99, 43.28, 43.72, 44.21, 45.11, 46.27, 47.33, 48.39, 49.35, 49.99, 50.66, 51.27, 52.15, 53.57, 54.99, 56.5, 58.28, 59.91, 61.3, 62.7, 63.78, 64.86, 65.82, 66.65, 67.3, 67.61, 68.02, 68.75, 69.47, 70.5, 71.63, 73.24, 74.45, 75.07, 75.79, 76.51, 76.87, 77.41, 77.88, 78.61, 79.61, 80.9, 82.18, 83.49, 84.78, 85.75, 86.65, 87.25, 87.9, 88.54, 89.08, 88.8, 88.95, 89.23, 89.27, 89.03, 88.79, 88.4, 87.78, 87.25, 86.37, 84.87, 83.67, 82.47, 81.27, 80.6, 79.82, 78.9, 77.75]}, "IREN": {"dates": ["11/15", "11/16", "11/17", "11/18", "11/19", "11/20", "11/21", "11/22", "11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29", "11/30", "12/01", "12/02", "12/03", "12/04", "12/05", "12/06", "12/07", "12/08", "12/09", "12/10", "12/11", "12/12", "12/13", "12/14", "12/15", "12/16", "12/17", "12/18", "12/19", "12/20", "12/21", "12/22", "12/23", "12/24", "12/25", "12/26", "12/27", "12/28", "12/29", "12/30", "12/31", "01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07", "01/08", "01/09", "01/10", "01/11", "01/12", "01/13", "01/14", "01/15", "01/16", "01/17", "01/18", "01/19", "01/20", "01/21", "01/22", "01/23", "01/24", "01/25", "01/26", "01/27", "01/28", "01/29", "01/30", "01/31", "02/01", "02/02", "02/03", "02/04", "02/05", "02/06", "02/07", "02/08", "02/09", "02/10", "02/11", "02/12"], "prices": [46.37, 46.37, 47.41, 48.85, 45.83, 43.47, 42.26, 42.26, 42.26, 48.49, 47.47, 48.45, 48.45, 47.81, 47.81, 47.81, 48.49, 41.12, 43.96, 46.45, 44.71, 44.71, 44.71, 46.34, 46.84, 43.92, 43.94, 40.13, 40.13, 40.13, 35.48, 36.59, 33.78, 35.8, 39.92, 39.92, 39.92, 42.04, 42.07, 41.98, 41.98, 40.3, 40.3, 40.3, 39.41, 38.3, 37.77, 37.77, 42.7, 42.7, 42.7, 48.24, 45.91, 43.62, 45.68, 46.03, 46.03, 46.03, 50.33, 52.99, 52.88, 51.89, 57.82, 57.82, 57.82, 57.82, 54.26, 53.48, 52.26, 56.68, 56.68, 56.68, 52.36, 59.99, 62.94, 59.84, 53.74, 53.74, 53.74, 53.08, 54.39, 44.94, 39.79, 41.83, 41.83, 41.83, 46.15, 42.93, 42.67, 40.03], "ma20": [60.39, 59.46, 58.71, 58.13, 57.51, 56.65, 55.72, 54.8, 53.52, 52.62, 51.17, 50.25, 49.55, 48.82, 48.09, 47.47, 47.03, 46.3, 46.07, 46.07, 45.99, 45.9, 45.77, 45.64, 45.69, 45.72, 45.8, 45.69, 45.59, 45.17, 44.57, 43.98, 43.24, 42.64, 42.25, 41.85, 41.42, 41.47, 41.38, 41.15, 41.02, 40.8, 40.58, 40.27, 39.9, 39.62, 39.31, 39.19, 39.32, 39.45, 39.81, 40.39, 41.0, 41.39, 41.68, 41.99, 42.29, 42.49, 42.9, 43.45, 44.0, 44.58, 45.46, 46.33, 47.25, 48.23, 49.05, 49.84, 50.32, 51.01, 51.71, 52.14, 52.46, 53.28, 54.14, 54.83, 55.22, 55.6, 55.77, 55.78, 55.85, 55.5, 54.6, 53.8, 53.0, 52.2, 51.8, 51.27, 50.79, 49.96]}, "PLTR": {"dates": ["11/15", "11/16", "11/17", "11/18", "11/19", "11/20", "11/21", "11/22", "11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29", "11/30", "12/01", "12/02", "12/03", "12/04", "12/05", "12/06", "12/07", "12/08", "12/09", "12/10", "12/11", "12/12", "12/13", "12/14", "12/15", "12/16", "12/17", "12/18", "12/19", "12/20", "12/21", "12/22", "12/23", "12/24", "12/25", "12/26", "12/27", "12/28", "12/29", "12/30", "12/31", "01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07", "01/08", "01/09", "01/10", "01/11", "01/12", "01/13", "01/14", "01/15", "01/16", "01/17", "01/18", "01/19", "01/20", "01/21", "01/22", "01/23", "01/24", "01/25", "01/26", "01/27", "01/28", "01/29", "01/30", "01/31", "02/01", "02/02", "02/03", "02/04", "02/05", "02/06", "02/07", "02/08", "02/09", "02/10", "02/11", "02/12"], "prices": [174.01, 174.01, 171.25, 167.33, 165.42, 155.74, 154.85, 154.85, 154.85, 162.25, 163.55, 165.77, 165.77, 168.45, 168.45, 168.45, 167.49, 170.69, 176.08, 177.92, 181.76, 181.76, 181.76, 181.49, 181.84, 187.91, 187.54, 183.57, 183.57, 183.57, 183.25, 187.75, 177.29, 185.69, 193.38, 193.38, 193.38, 193.98, 194.13, 194.17, 194.17, 188.71, 188.71, 188.71, 184.18, 180.84, 177.75, 177.75, 167.86, 167.86, 167.86, 174.04, 179.71, 181.68, 176.86, 177.49, 177.49, 177.49, 179.41, 178.96, 178.4, 177.07, 170.96, 170.96, 170.96, 170.96, 168.53, 165.33, 165.9, 169.6, 169.6, 169.6, 167.47, 165.7, 157.35, 151.86, 146.59, 146.59, 146.59, 147.76, 157.88, 139.54, 130.01, 135.9, 135.9, 135.9, 142.91, 139.51, 135.68, 129.13], "ma20": [187.86, 187.1, 186.18, 184.61, 183.15, 180.91, 178.63, 176.35, 173.73, 172.31, 171.09, 170.63, 170.02, 169.55, 169.07, 167.81, 166.64, 165.97, 166.16, 166.36, 166.75, 167.13, 167.66, 168.37, 169.19, 170.8, 172.43, 173.87, 175.3, 176.37, 177.35, 178.45, 179.03, 179.89, 181.14, 182.38, 183.68, 184.84, 185.75, 186.56, 187.18, 187.53, 187.87, 188.24, 188.35, 188.0, 187.51, 187.22, 186.43, 185.65, 184.88, 184.19, 184.31, 184.11, 183.29, 182.49, 181.7, 180.87, 180.14, 179.38, 178.59, 178.01, 177.12, 176.23, 175.57, 175.08, 174.62, 173.99, 173.9, 173.98, 174.07, 173.85, 173.24, 172.44, 171.46, 170.18, 168.64, 167.09, 165.45, 163.89, 162.86, 160.99, 158.94, 157.19, 155.43, 153.68, 152.4, 151.11, 149.6, 147.57]}, "SMCI": {"dates": ["11/15", "11/16", "11/17", "11/18", "11/19", "11/20", "11/21", "11/22", "11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29", "11/30", "12/01", "12/02", "12/03", "12/04", "12/05", "12/06", "12/07", "12/08", "12/09", "12/10", "12/11", "12/12", "12/13", "12/14", "12/15", "12/16", "12/17", "12/18", "12/19", "12/20", "12/21", "12/22", "12/23", "12/24", "12/25", "12/26", "12/27", "12/28", "12/29", "12/30", "12/31", "01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07", "01/08", "01/09", "01/10", "01/11", "01/12", "01/13", "01/14", "01/15", "01/16", "01/17", "01/18", "01/19", "01/20", "01/21", "01/22", "01/23", "01/24", "01/25", "01/26", "01/27", "01/28", "01/29", "01/30", "01/31", "02/01", "02/02", "02/03", "02/04", "02/05", "02/06", "02/07", "02/08", "02/09", "02/10", "02/11", "02/12"], "prices": [36.42, 36.42, 34.1, 34.9, 33.73, 31.56, 32.19, 32.19, 32.19, 33.32, 32.48, 32.83, 32.83, 33.85, 33.85, 33.85, 33.41, 32.92, 33.68, 34.23, 34.69, 34.69, 34.69, 35.37, 35.02, 34.9, 34.02, 32.33, 32.33, 32.33, 31.37, 31.66, 29.84, 29.37, 31.11, 31.11, 31.11, 31.07, 30.76, 30.55, 30.55, 30.64, 30.64, 30.64, 30.08, 29.65, 29.27, 29.27, 30.96, 30.96, 30.96, 30.07, 30.54, 30.01, 29.9, 30.16, 30.16, 30.16, 30.12, 28.6, 28.27, 29.42, 32.64, 32.64, 32.64, 32.64, 31.41, 32.24, 32.45, 31.7, 31.7, 31.7, 30.8, 31.2, 31.21, 30.12, 29.11, 29.11, 29.11, 29.71, 29.67, 33.76, 30.85, 34.38, 34.38, 34.38, 33.53, 33.33, 32.04, 30.43], "ma20": [44.38, 43.62, 42.71, 41.82, 40.98, 39.96, 38.98, 37.99, 37.06, 36.35, 35.88, 35.5, 35.16, 34.86, 34.56, 34.25, 33.98, 33.73, 33.66, 33.55, 33.46, 33.37, 33.4, 33.43, 33.49, 33.66, 33.75, 33.76, 33.76, 33.71, 33.66, 33.6, 33.45, 33.23, 33.09, 32.95, 32.84, 32.75, 32.6, 32.42, 32.21, 32.01, 31.8, 31.57, 31.32, 31.06, 30.82, 30.67, 30.6, 30.53, 30.51, 30.43, 30.47, 30.5, 30.44, 30.39, 30.34, 30.3, 30.26, 30.17, 30.05, 29.99, 30.09, 30.19, 30.32, 30.47, 30.58, 30.72, 30.8, 30.84, 30.87, 30.96, 30.97, 31.03, 31.09, 31.09, 31.04, 30.99, 30.94, 30.99, 31.06, 31.28, 31.19, 31.28, 31.36, 31.45, 31.56, 31.61, 31.59, 31.53]}, "COIN": {"dates": ["11/15", "11/16", "11/17", "11/18", "11/19", "11/20", "11/21", "11/22", "11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29", "11/30", "12/01", "12/02", "12/03", "12/04", "12/05", "12/06", "12/07", "12/08", "12/09", "12/10", "12/11", "12/12", "12/13", "12/14", "12/15", "12/16", "12/17", "12/18", "12/19", "12/20", "12/21", "12/22", "12/23", "12/24", "12/25", "12/26", "12/27", "12/28", "12/29", "12/30", "12/31", "01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07", "01/08", "01/09", "01/10", "01/11", "01/12", "01/13", "01/14", "01/15", "01/16", "01/17", "01/18", "01/19", "01/20", "01/21", "01/22", "01/23", "01/24", "01/25", "01/26", "01/27", "01/28", "01/29", "01/30", "01/31", "02/01", "02/02", "02/03", "02/04", "02/05", "02/06", "02/07", "02/08", "02/09", "02/10", "02/11", "02/12"], "prices": [284.0, 284.0, 263.95, 261.79, 257.29, 238.16, 240.41, 240.41, 240.41, 255.97, 254.12, 264.97, 264.97, 272.82, 272.82, 272.82, 259.84, 263.26, 276.92, 274.05, 269.73, 269.73, 269.73, 274.2, 277.36, 275.09, 269.02, 267.46, 267.46, 267.46, 250.42, 252.61, 244.19, 239.2, 245.12, 245.12, 245.12, 247.9, 242.3, 239.73, 239.73, 236.9, 236.9, 236.9, 233.77, 231.6, 226.14, 226.14, 236.53, 236.53, 236.53, 254.92, 250.56, 245.93, 245.59, 240.78, 240.78, 240.78, 242.98, 252.69, 255.86, 239.28, 241.15, 241.15, 241.15, 241.15, 227.73, 226.93, 223.14, 216.95, 216.95, 216.95, 213.48, 210.83, 209.43, 199.18, 194.74, 194.74, 194.74, 187.86, 179.66, 168.62, 146.12, 165.12, 165.12, 165.12, 167.25, 162.51, 153.2, 141.09], "ma20": [319.09, 315.22, 310.66, 306.32, 302.76, 297.48, 292.31, 287.14, 282.64, 280.07, 276.81, 275.3, 273.09, 271.27, 269.46, 267.2, 264.99, 262.96, 262.65, 262.15, 261.44, 260.72, 261.01, 261.63, 262.64, 264.48, 265.91, 267.26, 268.62, 269.19, 269.01, 268.39, 267.35, 265.67, 264.28, 262.9, 262.16, 261.39, 259.66, 257.95, 256.45, 254.81, 253.16, 251.3, 249.12, 246.95, 244.8, 242.74, 241.19, 239.64, 238.95, 239.06, 239.38, 239.72, 239.74, 239.52, 239.31, 238.95, 238.99, 239.63, 240.44, 240.56, 240.77, 240.98, 241.35, 241.83, 241.91, 241.95, 241.28, 240.3, 239.32, 237.42, 235.57, 233.81, 232.01, 229.93, 227.62, 225.32, 222.91, 219.67, 215.86, 212.33, 207.57, 203.77, 199.97, 196.17, 193.15, 189.93, 186.43, 182.64]}, "MSTR": {"dates": ["11/15", "11/16", "11/17", "11/18", "11/19", "11/20", "11/21", "11/22", "11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29", "11/30", "12/01", "12/02", "12/03", "12/04", "12/05", "12/06", "12/07", "12/08", "12/09", "12/10", "12/11", "12/12", "12/13", "12/14", "12/15", "12/16", "12/17", "12/18", "12/19", "12/20", "12/21", "12/22", "12/23", "12/24", "12/25", "12/26", "12/27", "12/28", "12/29", "12/30", "12/31", "01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07", "01/08", "01/09", "01/10", "01/11", "01/12", "01/13", "01/14", "01/15", "01/16", "01/17", "01/18", "01/19", "01/20", "01/21", "01/22", "01/23", "01/24", "01/25", "01/26", "01/27", "01/28", "01/29", "01/30", "01/31", "02/01", "02/02", "02/03", "02/04", "02/05", "02/06", "02/07", "02/08", "02/09", "02/10", "02/11", "02/12"], "prices": [199.75, 199.75, 195.42, 206.8, 186.5, 177.13, 170.5, 170.5, 170.5, 179.04, 172.19, 175.64, 175.64, 177.18, 177.18, 177.18, 171.42, 181.33, 188.39, 186.01, 178.99, 178.99, 178.99, 183.69, 188.99, 184.64, 183.3, 176.45, 176.45, 176.45, 162.08, 167.5, 160.38, 158.24, 164.82, 164.82, 164.82, 164.32, 157.88, 158.71, 158.71, 158.81, 158.81, 158.81, 155.39, 155.61, 151.95, 151.95, 157.16, 157.16, 157.16, 164.72, 157.97, 161.83, 166.97, 157.33, 157.33, 157.33, 162.23, 172.99, 179.33, 170.91, 173.71, 173.71, 173.71, 173.71, 160.23, 163.81, 160.98, 163.11, 163.11, 163.11, 160.58, 161.58, 158.45, 143.19, 149.71, 149.71, 149.71, 139.63, 133.26, 129.09, 106.99, 134.93, 134.93, 134.93, 138.44, 133.0, 126.07, 123.0], "ma20": [247.56, 242.77, 238.31, 234.88, 231.48, 226.86, 221.91, 216.96, 212.25, 208.85, 204.71, 201.63, 198.32, 195.08, 191.84, 188.76, 185.76, 183.6, 182.59, 181.9, 180.86, 179.83, 179.0, 177.85, 177.97, 178.35, 178.99, 179.29, 179.58, 179.45, 178.95, 178.54, 177.78, 176.83, 176.21, 175.6, 175.27, 174.42, 172.89, 171.53, 170.51, 169.5, 168.49, 167.25, 165.57, 164.12, 162.55, 161.33, 160.36, 159.4, 159.15, 159.01, 158.89, 159.07, 159.18, 158.8, 158.43, 158.08, 158.3, 159.01, 160.04, 160.65, 161.39, 162.14, 163.05, 163.96, 164.37, 164.97, 165.16, 165.45, 165.75, 165.67, 165.8, 165.79, 165.36, 164.66, 164.27, 163.89, 163.27, 161.6, 159.3, 157.21, 153.87, 151.93, 149.99, 148.05, 146.96, 145.42, 143.68, 141.67]}, "AFRM": {"dates": ["11/15", "11/16", "11/17", "11/18", "11/19", "11/20", "11/21", "11/22", "11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29", "11/30", "12/01", "12/02", "12/03", "12/04", "12/05", "12/06", "12/07", "12/08", "12/09", "12/10", "12/11", "12/12", "12/13", "12/14", "12/15", "12/16", "12/17", "12/18", "12/19", "12/20", "12/21", "12/22", "12/23", "12/24", "12/25", "12/26", "12/27", "12/28", "12/29", "12/30", "12/31", "01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07", "01/08", "01/09", "01/10", "01/11", "01/12", "01/13", "01/14", "01/15", "01/16", "01/17", "01/18", "01/19", "01/20", "01/21", "01/22", "01/23", "01/24", "01/25", "01/26", "01/27", "01/28", "01/29", "01/30", "01/31", "02/01", "02/02", "02/03", "02/04", "02/05", "02/06", "02/07", "02/08", "02/09", "02/10", "02/11", "02/12"], "prices": [70.51, 70.51, 68.17, 65.69, 65.35, 62.54, 64.38, 64.38, 64.38, 66.89, 68.83, 68.8, 68.8, 70.95, 70.95, 70.95, 69.07, 67.02, 69.64, 68.69, 67.99, 67.99, 67.99, 68.11, 68.42, 70.86, 69.03, 67.25, 67.25, 67.25, 65.66, 73.39, 72.04, 76.37, 76.22, 76.22, 76.22, 78.57, 75.64, 75.99, 75.99, 75.81, 75.81, 75.81, 75.51, 75.85, 74.43, 74.43, 74.03, 74.03, 74.03, 80.8, 82.35, 83.05, 81.61, 81.8, 81.8, 81.8, 76.39, 75.97, 72.61, 71.81, 74.76, 74.76, 74.76, 74.76, 71.1, 71.76, 72.83, 71.43, 71.43, 71.43, 68.71, 68.79, 65.36, 62.8, 60.3, 60.3, 60.3, 61.99, 61.66, 62.16, 59.42, 57.03, 57.03, 57.03, 57.95, 59.65, 56.54, 49.76], "ma20": [72.79, 72.49, 72.1, 71.76, 71.58, 71.11, 70.74, 70.36, 69.98, 69.75, 69.62, 69.76, 69.52, 69.38, 69.25, 68.99, 68.69, 68.09, 67.92, 67.82, 67.7, 67.57, 67.56, 67.68, 67.84, 68.25, 68.49, 68.63, 68.77, 68.79, 68.63, 68.86, 69.02, 69.3, 69.56, 69.82, 70.18, 70.76, 71.06, 71.42, 71.82, 72.21, 72.6, 72.99, 73.34, 73.59, 73.86, 74.22, 74.56, 74.9, 75.32, 75.69, 76.21, 76.54, 76.81, 77.09, 77.37, 77.53, 77.57, 77.57, 77.4, 77.2, 77.14, 77.09, 77.05, 77.0, 76.83, 76.7, 76.64, 76.51, 76.38, 75.91, 75.23, 74.52, 73.7, 72.75, 71.68, 70.6, 69.8, 69.1, 68.55, 68.07, 67.3, 66.42, 65.53, 64.64, 63.99, 63.38, 62.57, 61.48]}, "HOOD": {"dates": ["11/15", "11/16", "11/17", "11/18", "11/19", "11/20", "11/21", "11/22", "11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29", "11/30", "12/01", "12/02", "12/03", "12/04", "12/05", "12/06", "12/07", "12/08", "12/09", "12/10", "12/11", "12/12", "12/13", "12/14", "12/15", "12/16", "12/17", "12/18", "12/19", "12/20", "12/21", "12/22", "12/23", "12/24", "12/25", "12/26", "12/27", "12/28", "12/29", "12/30", "12/31", "01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07", "01/08", "01/09", "01/10", "01/11", "01/12", "01/13", "01/14", "01/15", "01/16", "01/17", "01/18", "01/19", "01/20", "01/21", "01/22", "01/23", "01/24", "01/25", "01/26", "01/27", "01/28", "01/29", "01/30", "01/31", "02/01", "02/02", "02/03", "02/04", "02/05", "02/06", "02/07", "02/08", "02/09", "02/10", "02/11", "02/12"], "prices": [122.5, 122.5, 115.97, 114.3, 118.16, 106.21, 107.3, 107.3, 107.3, 114.97, 115.57, 128.2, 128.2, 128.49, 128.49, 128.49, 123.24, 125.95, 133.64, 137.08, 131.95, 131.95, 131.95, 136.43, 135.71, 135.66, 123.38, 119.5, 119.5, 119.5, 115.26, 119.4, 115.8, 117.16, 121.35, 121.35, 121.35, 122.37, 120.24, 120.44, 120.44, 118.13, 118.13, 118.13, 117.43, 115.45, 113.1, 113.1, 115.21, 115.21, 115.21, 123.24, 121.7, 116.97, 115.39, 115.27, 115.27, 115.27, 117.52, 120.24, 119.67, 110.35, 108.74, 108.74, 108.74, 108.74, 105.78, 105.92, 106.25, 106.99, 106.99, 106.99, 107.0, 105.24, 103.4, 101.24, 99.48, 99.48, 99.48, 89.91, 87.07, 80.62, 72.68, 82.82, 82.82, 82.82, 86.56, 85.6, 77.97, 71.12], "ma20": [136.36, 135.19, 133.68, 132.15, 131.16, 129.13, 127.15, 125.18, 123.19, 122.1, 120.75, 120.81, 120.7, 120.61, 120.51, 120.14, 119.71, 119.36, 119.96, 120.69, 121.17, 121.64, 122.44, 123.54, 124.42, 125.89, 126.7, 127.31, 127.92, 128.14, 128.13, 127.69, 127.07, 126.5, 126.15, 125.79, 125.69, 125.51, 124.84, 124.01, 123.44, 122.75, 122.06, 121.14, 120.23, 119.22, 118.7, 118.38, 118.17, 117.95, 117.95, 118.14, 118.44, 118.43, 118.13, 117.83, 117.52, 117.17, 117.03, 117.02, 116.98, 116.59, 116.12, 115.65, 115.22, 114.88, 114.52, 114.16, 113.71, 113.3, 112.89, 112.08, 111.34, 110.75, 110.16, 109.45, 108.66, 107.87, 106.97, 105.46, 103.83, 102.34, 100.54, 99.24, 97.95, 96.65, 95.69, 94.67, 93.26, 91.46]}, "SOFI": {"dates": ["11/15", "11/16", "11/17", "11/18", "11/19", "11/20", "11/21", "11/22", "11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29", "11/30", "12/01", "12/02", "12/03", "12/04", "12/05", "12/06", "12/07", "12/08", "12/09", "12/10", "12/11", "12/12", "12/13", "12/14", "12/15", "12/16", "12/17", "12/18", "12/19", "12/20", "12/21", "12/22", "12/23", "12/24", "12/25", "12/26", "12/27", "12/28", "12/29", "12/30", "12/31", "01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07", "01/08", "01/09", "01/10", "01/11", "01/12", "01/13", "01/14", "01/15", "01/16", "01/17", "01/18", "01/19", "01/20", "01/21", "01/22", "01/23", "01/24", "01/25", "01/26", "01/27", "01/28", "01/29", "01/30", "01/31", "02/01", "02/02", "02/03", "02/04", "02/05", "02/06", "02/07", "02/08", "02/09", "02/10", "02/11", "02/12"], "prices": [27.82, 27.82, 27.04, 26.24, 26.72, 24.91, 25.19, 25.19, 25.19, 27.4, 28.33, 28.49, 28.49, 29.72, 29.72, 29.72, 29.03, 29.51, 29.07, 29.6, 27.78, 27.78, 27.78, 27.61, 26.83, 27.09, 27.07, 27.28, 27.28, 27.28, 25.82, 26.58, 25.27, 26.29, 27.24, 27.24, 27.24, 27.35, 27.19, 27.48, 27.48, 27.07, 27.07, 27.07, 26.82, 26.56, 26.18, 26.18, 27.46, 27.46, 27.46, 29.28, 26.98, 27.0, 27.72, 27.4, 27.4, 27.4, 26.6, 27.14, 26.67, 26.44, 26.13, 26.13, 26.13, 26.13, 25.49, 25.64, 26.09, 25.85, 25.85, 25.85, 25.8, 25.46, 24.6, 24.36, 22.81, 22.81, 22.81, 22.08, 21.76, 20.75, 19.46, 20.86, 20.86, 20.86, 21.35, 21.18, 20.55, 19.3], "ma20": [29.51, 29.4, 29.17, 28.94, 28.82, 28.58, 28.36, 28.13, 27.86, 27.76, 27.68, 27.74, 27.76, 27.83, 27.91, 27.87, 27.77, 27.64, 27.67, 27.76, 27.76, 27.76, 27.79, 27.86, 27.87, 27.98, 28.07, 28.17, 28.28, 28.27, 28.15, 28.05, 27.89, 27.72, 27.6, 27.47, 27.38, 27.27, 27.18, 27.07, 27.06, 27.02, 26.99, 26.96, 26.96, 26.93, 26.89, 26.83, 26.84, 26.85, 26.93, 27.07, 27.15, 27.19, 27.21, 27.22, 27.23, 27.23, 27.2, 27.19, 27.15, 27.11, 27.07, 27.02, 26.99, 26.96, 26.93, 26.9, 26.83, 26.75, 26.67, 26.5, 26.44, 26.37, 26.21, 26.06, 25.83, 25.6, 25.41, 25.16, 24.91, 24.63, 24.29, 24.03, 23.77, 23.5, 23.3, 23.07, 22.8, 22.47]}, "QBTS": {"dates": ["11/15", "11/16", "11/17", "11/18", "11/19", "11/20", "11/21", "11/22", "11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29", "11/30", "12/01", "12/02", "12/03", "12/04", "12/05", "12/06", "12/07", "12/08", "12/09", "12/10", "12/11", "12/12", "12/13", "12/14", "12/15", "12/16", "12/17", "12/18", "12/19", "12/20", "12/21", "12/22", "12/23", "12/24", "12/25", "12/26", "12/27", "12/28", "12/29", "12/30", "12/31", "01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07", "01/08", "01/09", "01/10", "01/11", "01/12", "01/13", "01/14", "01/15", "01/16", "01/17", "01/18", "01/19", "01/20", "01/21", "01/22", "01/23", "01/24", "01/25", "01/26", "01/27", "01/28", "01/29", "01/30", "01/31", "02/01", "02/02", "02/03", "02/04", "02/05", "02/06", "02/07", "02/08", "02/09", "02/10", "02/11", "02/12"], "prices": [23.61, 23.61, 22.83, 22.93, 23.44, 20.51, 20.41, 20.41, 20.41, 23.11, 22.59, 22.41, 22.41, 22.67, 22.67, 22.67, 21.42, 22.5, 25.08, 28.73, 27.0, 27.0, 27.0, 28.44, 28.33, 26.8, 27.98, 26.1, 26.1, 26.1, 23.74, 25.52, 23.8, 24.89, 26.82, 26.82, 26.82, 32.19, 29.12, 27.52, 27.52, 25.29, 25.29, 25.29, 26.15, 26.25, 26.15, 26.15, 28.13, 28.13, 28.13, 30.64, 31.27, 30.2, 29.28, 28.11, 28.11, 28.11, 28.8, 28.82, 30.15, 28.72, 28.83, 28.83, 28.83, 28.83, 27.04, 26.04, 27.43, 25.63, 25.63, 25.63, 23.75, 24.69, 24.97, 23.22, 21.22, 21.22, 21.22, 20.97, 21.4, 20.11, 17.21, 20.72, 20.72, 20.72, 21.21, 20.44, 19.64, 18.82], "ma20": [30.74, 30.16, 29.71, 29.14, 28.51, 27.68, 26.85, 26.01, 25.38, 25.05, 24.63, 24.33, 23.97, 23.63, 23.29, 22.95, 22.58, 22.38, 22.47, 22.72, 22.89, 23.06, 23.27, 23.54, 23.79, 24.1, 24.48, 24.77, 25.05, 25.2, 25.26, 25.41, 25.48, 25.59, 25.8, 26.01, 26.28, 26.76, 26.96, 26.9, 26.93, 26.84, 26.76, 26.6, 26.49, 26.47, 26.37, 26.38, 26.48, 26.58, 26.8, 27.05, 27.43, 27.69, 27.82, 27.88, 27.95, 27.74, 27.73, 27.79, 27.92, 28.09, 28.27, 28.45, 28.58, 28.71, 28.76, 28.75, 28.72, 28.59, 28.47, 28.21, 27.84, 27.56, 27.35, 27.1, 26.76, 26.41, 26.03, 25.64, 25.2, 24.77, 24.19, 23.79, 23.38, 22.98, 22.69, 22.41, 22.02, 21.68]}, "RGTI": {"dates": ["11/15", "11/16", "11/17", "11/18", "11/19", "11/20", "11/21", "11/22", "11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29", "11/30", "12/01", "12/02", "12/03", "12/04", "12/05", "12/06", "12/07", "12/08", "12/09", "12/10", "12/11", "12/12", "12/13", "12/14", "12/15", "12/16", "12/17", "12/18", "12/19", "12/20", "12/21", "12/22", "12/23", "12/24", "12/25", "12/26", "12/27", "12/28", "12/29", "12/30", "12/31", "01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07", "01/08", "01/09", "01/10", "01/11", "01/12", "01/13", "01/14", "01/15", "01/16", "01/17", "01/18", "01/19", "01/20", "01/21", "01/22", "01/23", "01/24", "01/25", "01/26", "01/27", "01/28", "01/29", "01/30", "01/31", "02/01", "02/02", "02/03", "02/04", "02/05", "02/06", "02/07", "02/08", "02/09", "02/10", "02/11", "02/12"], "prices": [25.48, 25.48, 24.69, 25.71, 25.46, 22.8, 23.59, 23.59, 23.59, 26.57, 26.08, 25.57, 25.57, 25.57, 25.57, 25.57, 23.45, 23.88, 26.04, 30.06, 28.11, 28.11, 28.11, 28.26, 28.22, 26.12, 26.88, 25.84, 25.84, 25.84, 23.53, 23.96, 22.47, 22.82, 23.76, 23.76, 23.76, 26.88, 25.11, 24.51, 24.51, 22.38, 22.38, 22.38, 22.27, 22.41, 22.15, 22.15, 23.6, 23.6, 23.6, 25.01, 25.38, 25.21, 25.25, 24.72, 24.72, 24.72, 25.53, 24.47, 25.72, 24.7, 25.62, 25.62, 25.62, 25.62, 24.99, 23.67, 24.96, 23.45, 23.45, 23.45, 21.76, 22.31, 22.01, 19.85, 18.17, 18.17, 18.17, 17.71, 18.21, 17.19, 14.98, 17.71, 17.71, 17.71, 17.59, 16.97, 16.43, 14.99], "ma20": [35.41, 34.67, 34.06, 33.37, 32.52, 31.44, 30.41, 29.38, 28.6, 28.17, 27.61, 27.17, 26.76, 26.35, 25.94, 25.56, 25.17, 24.94, 24.99, 25.22, 25.35, 25.48, 25.65, 25.78, 25.92, 26.08, 26.25, 26.36, 26.47, 26.43, 26.31, 26.23, 26.07, 25.93, 25.84, 25.75, 25.77, 25.92, 25.87, 25.59, 25.41, 25.13, 24.84, 24.55, 24.25, 24.06, 23.83, 23.64, 23.53, 23.42, 23.42, 23.48, 23.62, 23.74, 23.81, 23.86, 23.91, 23.8, 23.82, 23.82, 23.88, 24.0, 24.16, 24.32, 24.49, 24.65, 24.79, 24.87, 24.94, 24.93, 24.92, 24.84, 24.66, 24.52, 24.36, 24.11, 23.78, 23.46, 23.09, 22.75, 22.38, 22.0, 21.47, 21.07, 20.68, 20.28, 19.91, 19.58, 19.15, 18.73]}, "SMR": {"dates": ["11/15", "11/16", "11/17", "11/18", "11/19", "11/20", "11/21", "11/22", "11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29", "11/30", "12/01", "12/02", "12/03", "12/04", "12/05", "12/06", "12/07", "12/08", "12/09", "12/10", "12/11", "12/12", "12/13", "12/14", "12/15", "12/16", "12/17", "12/18", "12/19", "12/20", "12/21", "12/22", "12/23", "12/24", "12/25", "12/26", "12/27", "12/28", "12/29", "12/30", "12/31", "01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07", "01/08", "01/09", "01/10", "01/11", "01/12", "01/13", "01/14", "01/15", "01/16", "01/17", "01/18", "01/19", "01/20", "01/21", "01/22", "01/23", "01/24", "01/25", "01/26", "01/27", "01/28", "01/29", "01/30", "01/31", "02/01", "02/02", "02/03", "02/04", "02/05", "02/06", "02/07", "02/08", "02/09", "02/10", "02/11", "02/12"], "prices": [22.45, 22.45, 21.06, 21.54, 21.13, 18.7, 18.6, 18.6, 18.6, 19.94, 18.73, 19.04, 19.04, 20.0, 20.0, 20.0, 18.08, 18.91, 20.14, 22.85, 21.39, 21.39, 21.39, 21.56, 21.32, 20.32, 21.22, 18.34, 18.34, 18.34, 17.41, 17.12, 15.73, 15.79, 16.07, 16.07, 16.07, 16.43, 15.97, 16.08, 16.08, 14.85, 14.85, 14.85, 14.48, 14.31, 14.17, 14.17, 16.31, 16.31, 16.31, 18.78, 19.57, 19.47, 19.67, 20.51, 20.51, 20.51, 19.72, 19.23, 19.83, 18.9, 20.19, 20.19, 20.19, 20.19, 19.0, 19.75, 20.64, 19.77, 19.77, 19.77, 18.4, 19.2, 20.48, 18.92, 17.48, 17.48, 17.48, 16.48, 17.88, 16.2, 14.84, 17.53, 17.53, 17.53, 17.68, 16.74, 15.57, 13.99], "ma20": [34.39, 33.58, 32.53, 31.45, 30.39, 29.08, 27.77, 26.46, 25.34, 24.56, 23.6, 22.93, 22.36, 21.85, 21.33, 20.91, 20.48, 20.12, 19.97, 19.99, 19.94, 19.89, 19.9, 19.9, 19.91, 19.99, 20.13, 20.11, 20.1, 20.02, 19.95, 19.86, 19.69, 19.48, 19.29, 19.09, 18.99, 18.86, 18.66, 18.32, 18.05, 17.72, 17.4, 17.06, 16.72, 16.42, 16.07, 15.86, 15.76, 15.66, 15.6, 15.68, 15.88, 16.06, 16.24, 16.46, 16.68, 16.89, 17.08, 17.23, 17.42, 17.62, 17.89, 18.16, 18.44, 18.74, 18.98, 19.26, 19.47, 19.65, 19.82, 19.87, 19.81, 19.8, 19.84, 19.76, 19.61, 19.46, 19.34, 19.21, 19.11, 18.97, 18.71, 18.57, 18.44, 18.31, 18.24, 18.09, 17.84, 17.55]}, "SOUN": {"dates": ["11/15", "11/16", "11/17", "11/18", "11/19", "11/20", "11/21", "11/22", "11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29", "11/30", "12/01", "12/02", "12/03", "12/04", "12/05", "12/06", "12/07", "12/08", "12/09", "12/10", "12/11", "12/12", "12/13", "12/14", "12/15", "12/16", "12/17", "12/18", "12/19", "12/20", "12/21", "12/22", "12/23", "12/24", "12/25", "12/26", "12/27", "12/28", "12/29", "12/30", "12/31", "01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07", "01/08", "01/09", "01/10", "01/11", "01/12", "01/13", "01/14", "01/15", "01/16", "01/17", "01/18", "01/19", "01/20", "01/21", "01/22", "01/23", "01/24", "01/25", "01/26", "01/27", "01/28", "01/29", "01/30", "01/31", "02/01", "02/02", "02/03", "02/04", "02/05", "02/06", "02/07", "02/08", "02/09", "02/10", "02/11", "02/12"], "prices": [12.17, 12.17, 11.43, 11.53, 11.63, 11.29, 11.22, 11.22, 11.22, 11.95, 11.94, 11.82, 11.82, 12.05, 12.05, 12.05, 11.52, 11.22, 11.78, 12.8, 12.76, 12.76, 12.76, 12.68, 12.31, 12.21, 12.03, 11.65, 11.65, 11.65, 10.79, 11.11, 10.99, 10.89, 11.02, 11.02, 11.02, 11.27, 11.0, 10.9, 10.9, 10.7, 10.7, 10.7, 10.41, 10.04, 9.97, 9.97, 10.6, 10.6, 10.6, 11.0, 11.23, 11.06, 11.02, 11.75, 11.75, 11.75, 11.57, 11.08, 11.28, 10.92, 11.1, 11.1, 11.1, 11.1, 10.45, 10.62, 10.9, 10.33, 10.33, 10.33, 9.84, 9.94, 9.69, 9.08, 8.46, 8.46, 8.46, 8.42, 8.26, 8.07, 7.35, 8.56, 8.56, 8.56, 8.81, 8.25, 7.96, 7.46], "ma20": [15.31, 15.0, 14.69, 14.36, 14.09, 13.78, 13.46, 13.14, 12.84, 12.68, 12.5, 12.37, 12.26, 12.15, 12.05, 11.93, 11.84, 11.73, 11.71, 11.74, 11.77, 11.8, 11.87, 11.93, 11.96, 12.01, 12.05, 12.07, 12.09, 12.08, 12.02, 11.98, 11.94, 11.88, 11.83, 11.78, 11.76, 11.76, 11.72, 11.62, 11.53, 11.43, 11.32, 11.23, 11.13, 11.02, 10.92, 10.83, 10.78, 10.73, 10.72, 10.72, 10.73, 10.74, 10.74, 10.77, 10.81, 10.83, 10.86, 10.87, 10.89, 10.9, 10.92, 10.94, 10.97, 11.03, 11.05, 11.08, 11.1, 11.09, 11.07, 11.04, 10.97, 10.91, 10.85, 10.71, 10.55, 10.38, 10.23, 10.1, 9.94, 9.8, 9.61, 9.49, 9.36, 9.23, 9.15, 9.03, 8.89, 8.74]}, "RCAT": {"dates": ["11/15", "11/16", "11/17", "11/18", "11/19", "11/20", "11/21", "11/22", "11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29", "11/30", "12/01", "12/02", "12/03", "12/04", "12/05", "12/06", "12/07", "12/08", "12/09", "12/10", "12/11", "12/12", "12/13", "12/14", "12/15", "12/16", "12/17", "12/18", "12/19", "12/20", "12/21", "12/22", "12/23", "12/24", "12/25", "12/26", "12/27", "12/28", "12/29", "12/30", "12/31", "01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07", "01/08", "01/09", "01/10", "01/11", "01/12", "01/13", "01/14", "01/15", "01/16", "01/17", "01/18", "01/19", "01/20", "01/21", "01/22", "01/23", "01/24", "01/25", "01/26", "01/27", "01/28", "01/29", "01/30", "01/31", "02/01", "02/02", "02/03", "02/04", "02/05", "02/06", "02/07", "02/08", "02/09", "02/10", "02/11", "02/12"], "prices": [7.16, 7.16, 6.77, 7.09, 6.61, 6.14, 6.36, 6.36, 6.36, 7.23, 7.28, 7.33, 7.33, 7.42, 7.42, 7.42, 6.97, 6.96, 7.55, 8.32, 8.02, 8.02, 8.02, 8.27, 8.61, 8.38, 8.79, 8.04, 8.04, 8.04, 7.48, 7.37, 6.89, 7.19, 8.05, 8.05, 8.05, 9.22, 9.18, 9.09, 9.09, 8.3, 8.3, 8.3, 7.81, 7.79, 7.93, 7.93, 9.16, 9.16, 9.16, 10.9, 10.82, 10.45, 11.83, 11.7, 11.7, 11.7, 11.94, 13.06, 13.66, 14.03, 13.67, 13.67, 13.67, 13.67, 14.41, 15.61, 17.36, 16.06, 16.06, 16.06, 14.25, 15.67, 16.38, 14.93, 13.5, 13.5, 13.5, 13.63, 14.25, 12.63, 11.31, 12.63, 12.63, 12.63, 13.71, 12.62, 12.01, 11.25], "ma20": [9.61, 9.4, 9.18, 8.97, 8.77, 8.52, 8.27, 8.03, 7.83, 7.72, 7.61, 7.55, 7.45, 7.36, 7.27, 7.18, 7.09, 7.01, 7.0, 7.06, 7.11, 7.15, 7.21, 7.27, 7.37, 7.48, 7.6, 7.69, 7.77, 7.81, 7.82, 7.82, 7.8, 7.79, 7.82, 7.85, 7.91, 8.02, 8.1, 8.14, 8.19, 8.21, 8.22, 8.22, 8.18, 8.15, 8.11, 8.11, 8.16, 8.22, 8.3, 8.48, 8.67, 8.84, 9.03, 9.21, 9.39, 9.51, 9.65, 9.85, 10.08, 10.37, 10.63, 10.9, 11.2, 11.49, 11.81, 12.2, 12.61, 12.95, 13.3, 13.56, 13.73, 13.99, 14.22, 14.38, 14.47, 14.56, 14.64, 14.66, 14.69, 14.62, 14.51, 14.45, 14.4, 14.35, 14.31, 14.17, 13.9, 13.66]}, "ACHR": {"dates": ["11/15", "11/16", "11/17", "11/18", "11/19", "11/20", "11/21", "11/22", "11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29", "11/30", "12/01", "12/02", "12/03", "12/04", "12/05", "12/06", "12/07", "12/08", "12/09", "12/10", "12/11", "12/12", "12/13", "12/14", "12/15", "12/16", "12/17", "12/18", "12/19", "12/20", "12/21", "12/22", "12/23", "12/24", "12/25", "12/26", "12/27", "12/28", "12/29", "12/30", "12/31", "01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07", "01/08", "01/09", "01/10", "01/11", "01/12", "01/13", "01/14", "01/15", "01/16", "01/17", "01/18", "01/19", "01/20", "01/21", "01/22", "01/23", "01/24", "01/25", "01/26", "01/27", "01/28", "01/29", "01/30", "01/31", "02/01", "02/02", "02/03", "02/04", "02/05", "02/06", "02/07", "02/08", "02/09", "02/10", "02/11", "02/12"], "prices": [7.88, 7.88, 7.42, 7.61, 7.47, 6.87, 7.18, 7.18, 7.18, 7.44, 7.38, 7.49, 7.49, 7.79, 7.79, 7.79, 7.46, 7.65, 8.35, 8.95, 8.6, 8.6, 8.6, 8.61, 8.63, 8.37, 8.56, 8.3, 8.3, 8.3, 7.83, 7.95, 7.58, 7.82, 8.16, 8.16, 8.16, 8.4, 8.14, 8.13, 8.13, 7.89, 7.89, 7.89, 7.7, 7.55, 7.52, 7.52, 8.13, 8.13, 8.13, 8.56, 8.82, 8.42, 8.71, 8.81, 8.81, 8.81, 8.86, 8.47, 8.91, 8.86, 8.86, 8.86, 8.86, 8.86, 8.65, 8.47, 9.01, 8.61, 8.61, 8.61, 8.03, 8.09, 7.73, 7.43, 7.19, 7.19, 7.19, 7.05, 7.2, 6.95, 6.49, 7.3, 7.3, 7.3, 7.37, 7.17, 6.97, 6.76], "ma20": [9.55, 9.38, 9.19, 9.01, 8.84, 8.62, 8.42, 8.22, 8.05, 7.95, 7.84, 7.77, 7.74, 7.72, 7.7, 7.66, 7.59, 7.54, 7.56, 7.61, 7.65, 7.68, 7.74, 7.79, 7.85, 7.93, 8.0, 8.05, 8.11, 8.15, 8.17, 8.2, 8.2, 8.2, 8.22, 8.24, 8.27, 8.31, 8.3, 8.26, 8.24, 8.2, 8.17, 8.13, 8.08, 8.04, 7.99, 7.95, 7.94, 7.93, 7.95, 7.98, 8.04, 8.07, 8.1, 8.13, 8.16, 8.18, 8.22, 8.24, 8.28, 8.33, 8.37, 8.42, 8.48, 8.55, 8.6, 8.65, 8.69, 8.72, 8.74, 8.74, 8.7, 8.69, 8.64, 8.57, 8.49, 8.41, 8.32, 8.25, 8.17, 8.07, 7.95, 7.88, 7.8, 7.72, 7.66, 7.59, 7.49, 7.4]}, "BBAI": {"dates": ["11/15", "11/16", "11/17", "11/18", "11/19", "11/20", "11/21", "11/22", "11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29", "11/30", "12/01", "12/02", "12/03", "12/04", "12/05", "12/06", "12/07", "12/08", "12/09", "12/10", "12/11", "12/12", "12/13", "12/14", "12/15", "12/16", "12/17", "12/18", "12/19", "12/20", "12/21", "12/22", "12/23", "12/24", "12/25", "12/26", "12/27", "12/28", "12/29", "12/30", "12/31", "01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07", "01/08", "01/09", "01/10", "01/11", "01/12", "01/13", "01/14", "01/15", "01/16", "01/17", "01/18", "01/19", "01/20", "01/21", "01/22", "01/23", "01/24", "01/25", "01/26", "01/27", "01/28", "01/29", "01/30", "01/31", "02/01", "02/02", "02/03", "02/04", "02/05", "02/06", "02/07", "02/08", "02/09", "02/10", "02/11", "02/12"], "prices": [6.06, 6.06, 5.57, 5.98, 5.84, 5.51, 5.4, 5.4, 5.4, 6.27, 6.19, 6.02, 6.02, 6.34, 6.34, 6.34, 6.05, 5.79, 6.1, 7.02, 6.82, 6.82, 6.82, 6.56, 6.71, 6.61, 6.74, 6.38, 6.38, 6.38, 5.97, 5.86, 5.44, 5.63, 6.26, 6.26, 6.26, 6.39, 6.12, 6.03, 6.03, 5.73, 5.73, 5.73, 5.67, 5.5, 5.4, 5.4, 5.84, 5.84, 5.84, 5.88, 6.41, 5.99, 6.17, 6.2, 6.2, 6.2, 6.31, 6.09, 6.26, 6.17, 6.12, 6.12, 6.12, 6.12, 5.94, 5.71, 5.93, 5.82, 5.82, 5.82, 5.72, 6.16, 6.01, 5.52, 5.04, 5.04, 5.04, 4.78, 4.95, 4.5, 4.08, 4.72, 4.72, 4.72, 4.87, 4.56, 4.43, 4.1], "ma20": [6.33, 6.28, 6.21, 6.17, 6.12, 6.05, 5.98, 5.9, 5.86, 5.88, 5.89, 5.9, 5.92, 5.95, 5.99, 6.02, 6.02, 5.95, 5.94, 5.99, 6.02, 6.06, 6.12, 6.15, 6.2, 6.25, 6.32, 6.37, 6.42, 6.42, 6.41, 6.4, 6.37, 6.34, 6.33, 6.33, 6.34, 6.37, 6.37, 6.32, 6.28, 6.23, 6.17, 6.13, 6.08, 6.02, 5.96, 5.91, 5.88, 5.85, 5.85, 5.85, 5.9, 5.92, 5.91, 5.91, 5.91, 5.9, 5.91, 5.91, 5.92, 5.94, 5.96, 5.98, 6.0, 6.03, 6.06, 6.08, 6.08, 6.08, 6.08, 6.08, 6.04, 6.05, 6.04, 6.01, 5.95, 5.89, 5.83, 5.76, 5.7, 5.61, 5.51, 5.44, 5.37, 5.3, 5.25, 5.19, 5.12, 5.03]}, "ASTS": {"dates": ["11/15", "11/16", "11/17", "11/18", "11/19", "11/20", "11/21", "11/22", "11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29", "11/30", "12/01", "12/02", "12/03", "12/04", "12/05", "12/06", "12/07", "12/08", "12/09", "12/10", "12/11", "12/12", "12/13", "12/14", "12/15", "12/16", "12/17", "12/18", "12/19", "12/20", "12/21", "12/22", "12/23", "12/24", "12/25", "12/26", "12/27", "12/28", "12/29", "12/30", "12/31", "01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07", "01/08", "01/09", "01/10", "01/11", "01/12", "01/13", "01/14", "01/15", "01/16", "01/17", "01/18", "01/19", "01/20", "01/21", "01/22", "01/23", "01/24", "01/25", "01/26", "01/27", "01/28", "01/29", "01/30", "01/31", "02/01", "02/02", "02/03", "02/04", "02/05", "02/06", "02/07", "02/08", "02/09", "02/10", "02/11", "02/12"], "prices": [61.4, 61.4, 56.6, 58.22, 58.01, 50.7, 51.37, 51.37, 51.37, 55.0, 55.51, 55.52, 55.52, 56.2, 56.2, 56.2, 52.61, 56.89, 61.44, 72.65, 73.92, 73.92, 73.92, 74.0, 72.84, 79.05, 84.75, 76.7, 76.7, 76.7, 67.81, 68.37, 61.86, 65.93, 75.84, 75.84, 75.84, 86.48, 85.67, 78.05, 78.05, 71.95, 71.95, 71.95, 71.47, 74.68, 72.63, 72.63, 83.47, 83.47, 83.47, 90.92, 97.49, 85.73, 90.56, 97.67, 97.67, 97.67, 98.39, 92.72, 95.22, 101.25, 115.77, 115.77, 115.77, 115.77, 112.44, 103.5, 116.37, 113.57, 113.57, 113.57, 104.78, 111.34, 121.23, 122.09, 111.21, 111.21, 111.21, 104.55, 115.76, 103.5, 93.27, 101.79, 101.79, 101.79, 102.12, 96.27, 96.92, 82.22], "ma20": [71.22, 70.32, 69.26, 68.17, 67.24, 65.76, 64.31, 62.87, 61.88, 61.13, 60.39, 59.9, 59.21, 58.56, 57.92, 57.29, 56.53, 56.15, 56.15, 56.71, 57.33, 57.96, 58.83, 59.62, 60.36, 61.77, 63.44, 64.71, 65.98, 67.06, 67.68, 68.32, 68.64, 69.12, 70.1, 71.09, 72.25, 73.73, 74.94, 75.21, 75.42, 75.32, 75.22, 75.12, 75.05, 74.83, 74.22, 74.02, 74.36, 74.7, 75.48, 76.61, 78.39, 79.38, 80.11, 81.21, 82.3, 82.86, 83.49, 84.23, 85.09, 86.55, 88.74, 90.93, 93.15, 95.2, 97.19, 98.74, 100.38, 101.89, 103.39, 104.52, 104.89, 106.17, 107.7, 108.92, 109.6, 110.28, 110.92, 111.51, 112.54, 112.65, 111.52, 110.82, 110.13, 109.43, 108.91, 108.55, 107.58, 106.01]}, "FNGU": {"dates": ["11/15", "11/16", "11/17", "11/18", "11/19", "11/20", "11/21", "11/22", "11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29", "11/30", "12/01", "12/02", "12/03", "12/04", "12/05", "12/06", "12/07", "12/08", "12/09", "12/10", "12/11", "12/12", "12/13", "12/14", "12/15", "12/16", "12/17", "12/18", "12/19", "12/20", "12/21", "12/22", "12/23", "12/24", "12/25", "12/26", "12/27", "12/28", "12/29", "12/30", "12/31", "01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07", "01/08", "01/09", "01/10", "01/11", "01/12", "01/13", "01/14", "01/15", "01/16", "01/17", "01/18", "01/19", "01/20", "01/21", "01/22", "01/23", "01/24", "01/25", "01/26", "01/27", "01/28", "01/29", "01/30", "01/31", "02/01", "02/02", "02/03", "02/04", "02/05", "02/06", "02/07", "02/08", "02/09", "02/10", "02/11", "02/12"], "prices": [28.99, 28.99, 28.34, 27.13, 27.67, 25.75, 25.94, 25.94, 25.94, 28.61, 29.14, 29.25, 29.25, 29.94, 29.94, 29.94, 29.74, 30.15, 29.6, 29.51, 29.79, 29.79, 29.79, 29.69, 29.88, 29.69, 29.39, 27.26, 27.26, 27.26, 25.24, 25.57, 24.15, 24.85, 25.68, 25.68, 25.68, 25.84, 26.56, 26.65, 26.65, 26.55, 26.55, 26.55, 26.01, 25.89, 25.26, 25.26, 24.13, 24.13, 24.13, 24.5, 24.85, 25.4, 24.65, 25.1, 25.1, 25.1, 25.21, 25.15, 23.87, 23.84, 23.59, 23.59, 23.59, 23.59, 21.58, 21.59, 22.18, 22.84, 22.84, 22.84, 23.51, 24.26, 23.81, 23.18, 22.54, 22.54, 22.54, 22.52, 21.5, 19.93, 18.48, 19.34, 19.34, 19.34, 20.25, 19.95, 19.41, 17.87], "ma20": [31.13, 30.99, 30.74, 30.4, 30.18, 29.84, 29.51, 29.18, 28.84, 28.73, 28.63, 28.61, 28.6, 28.62, 28.64, 28.56, 28.47, 28.43, 28.46, 28.49, 28.53, 28.57, 28.64, 28.77, 28.88, 29.08, 29.25, 29.31, 29.38, 29.31, 29.12, 28.93, 28.68, 28.42, 28.21, 28.0, 27.8, 27.58, 27.43, 27.29, 27.13, 26.97, 26.8, 26.65, 26.45, 26.26, 26.06, 25.96, 25.8, 25.64, 25.59, 25.53, 25.57, 25.6, 25.55, 25.52, 25.49, 25.45, 25.38, 25.31, 25.17, 25.03, 24.89, 24.74, 24.62, 24.5, 24.32, 24.13, 24.04, 23.97, 23.91, 23.83, 23.76, 23.7, 23.66, 23.56, 23.44, 23.31, 23.17, 23.04, 22.92, 22.73, 22.47, 22.26, 22.05, 21.84, 21.77, 21.69, 21.55, 21.3]}, "NTLA": {"dates": ["11/15", "11/16", "11/17", "11/18", "11/19", "11/20", "11/21", "11/22", "11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29", "11/30", "12/01", "12/02", "12/03", "12/04", "12/05", "12/06", "12/07", "12/08", "12/09", "12/10", "12/11", "12/12", "12/13", "12/14", "12/15", "12/16", "12/17", "12/18", "12/19", "12/20", "12/21", "12/22", "12/23", "12/24", "12/25", "12/26", "12/27", "12/28", "12/29", "12/30", "12/31", "01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07", "01/08", "01/09", "01/10", "01/11", "01/12", "01/13", "01/14", "01/15", "01/16", "01/17", "01/18", "01/19", "01/20", "01/21", "01/22", "01/23", "01/24", "01/25", "01/26", "01/27", "01/28", "01/29", "01/30", "01/31", "02/01", "02/02", "02/03", "02/04", "02/05", "02/06", "02/07", "02/08", "02/09", "02/10", "02/11", "02/12"], "prices": [8.7, 8.7, 8.48, 8.47, 8.24, 8.04, 8.21, 8.21, 8.21, 8.35, 8.55, 8.52, 8.52, 8.99, 8.99, 8.99, 8.42, 8.1, 9.06, 9.74, 9.61, 9.61, 9.61, 9.44, 9.3, 9.37, 9.55, 9.02, 9.02, 9.02, 9.14, 9.12, 8.79, 8.88, 9.23, 9.23, 9.23, 9.7, 9.42, 9.59, 9.59, 9.44, 9.44, 9.44, 9.14, 9.06, 8.99, 8.99, 9.21, 9.21, 9.21, 9.37, 9.73, 10.13, 10.52, 10.38, 10.38, 10.38, 11.43, 11.74, 12.02, 11.87, 12.5, 12.5, 12.5, 12.5, 12.83, 14.03, 15.9, 14.63, 14.63, 14.63, 13.95, 14.83, 13.82, 13.9, 13.15, 13.15, 13.15, 13.06, 13.05, 12.36, 11.09, 12.28, 12.28, 12.28, 12.49, 11.91, 12.0, 11.62], "ma20": [11.36, 11.05, 10.78, 10.55, 10.35, 10.12, 9.9, 9.68, 9.43, 9.24, 8.99, 8.8, 8.75, 8.72, 8.7, 8.66, 8.57, 8.5, 8.52, 8.57, 8.62, 8.67, 8.72, 8.77, 8.82, 8.89, 8.96, 9.0, 9.04, 9.07, 9.1, 9.13, 9.14, 9.14, 9.15, 9.16, 9.2, 9.28, 9.3, 9.29, 9.29, 9.28, 9.28, 9.28, 9.27, 9.25, 9.22, 9.22, 9.23, 9.24, 9.25, 9.26, 9.3, 9.37, 9.43, 9.49, 9.55, 9.58, 9.68, 9.79, 9.91, 10.03, 10.19, 10.34, 10.51, 10.68, 10.87, 11.12, 11.46, 11.73, 12.0, 12.26, 12.47, 12.71, 12.87, 13.05, 13.19, 13.33, 13.41, 13.48, 13.53, 13.55, 13.48, 13.47, 13.46, 13.45, 13.43, 13.33, 13.13, 12.98]}, "PL": {"dates": ["11/15", "11/16", "11/17", "11/18", "11/19", "11/20", "11/21", "11/22", "11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29", "11/30", "12/01", "12/02", "12/03", "12/04", "12/05", "12/06", "12/07", "12/08", "12/09", "12/10", "12/11", "12/12", "12/13", "12/14", "12/15", "12/16", "12/17", "12/18", "12/19", "12/20", "12/21", "12/22", "12/23", "12/24", "12/25", "12/26", "12/27", "12/28", "12/29", "12/30", "12/31", "01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07", "01/08", "01/09", "01/10", "01/11", "01/12", "01/13", "01/14", "01/15", "01/16", "01/17", "01/18", "01/19", "01/20", "01/21", "01/22", "01/23", "01/24", "01/25", "01/26", "01/27", "01/28", "01/29", "01/30", "01/31", "02/01", "02/02", "02/03", "02/04", "02/05", "02/06", "02/07", "02/08", "02/09", "02/10", "02/11", "02/12"], "prices": [11.4, 11.4, 11.21, 11.45, 11.79, 11.23, 11.16, 11.16, 11.16, 11.54, 11.73, 11.72, 11.72, 11.9, 11.9, 11.9, 11.7, 11.77, 12.01, 12.94, 12.77, 12.77, 12.77, 12.95, 12.84, 12.94, 17.47, 18.24, 18.24, 18.24, 18.05, 17.88, 16.47, 17.49, 19.18, 19.18, 19.18, 20.6, 20.73, 20.32, 20.32, 19.36, 19.36, 19.36, 19.87, 19.74, 19.72, 19.72, 20.41, 20.41, 20.41, 21.39, 21.84, 22.61, 22.44, 22.71, 22.71, 22.71, 25.44, 25.32, 26.73, 28.28, 28.78, 28.78, 28.78, 28.78, 28.0, 26.38, 26.06, 26.94, 26.94, 26.94, 25.87, 28.07, 27.88, 26.35, 24.97, 24.97, 24.97, 22.85, 23.95, 21.77, 20.43, 22.26, 22.26, 22.26, 24.02, 22.79, 21.65, 21.3], "ma20": [12.74, 12.64, 12.56, 12.49, 12.44, 12.33, 12.21, 12.1, 12.0, 11.94, 11.86, 11.82, 11.77, 11.72, 11.68, 11.6, 11.57, 11.53, 11.56, 11.64, 11.71, 11.78, 11.85, 11.93, 11.98, 12.07, 12.38, 12.74, 13.09, 13.43, 13.74, 14.05, 14.29, 14.57, 14.93, 15.29, 15.67, 16.11, 16.55, 16.92, 17.29, 17.62, 17.95, 18.27, 18.62, 18.96, 19.08, 19.15, 19.26, 19.37, 19.49, 19.66, 19.93, 20.19, 20.35, 20.52, 20.7, 20.81, 21.04, 21.29, 21.61, 22.06, 22.53, 23.0, 23.45, 23.9, 24.31, 24.65, 24.93, 25.25, 25.58, 25.86, 26.06, 26.33, 26.61, 26.79, 26.9, 27.01, 26.99, 26.87, 26.73, 26.4, 25.98, 25.66, 25.33, 25.01, 24.81, 24.63, 24.41, 24.13]}, "LUNR": {"dates": ["11/15", "11/16", "11/17", "11/18", "11/19", "11/20", "11/21", "11/22", "11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29", "11/30", "12/01", "12/02", "12/03", "12/04", "12/05", "12/06", "12/07", "12/08", "12/09", "12/10", "12/11", "12/12", "12/13", "12/14", "12/15", "12/16", "12/17", "12/18", "12/19", "12/20", "12/21", "12/22", "12/23", "12/24", "12/25", "12/26", "12/27", "12/28", "12/29", "12/30", "12/31", "01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07", "01/08", "01/09", "01/10", "01/11", "01/12", "01/13", "01/14", "01/15", "01/16", "01/17", "01/18", "01/19", "01/20", "01/21", "01/22", "01/23", "01/24", "01/25", "01/26", "01/27", "01/28", "01/29", "01/30", "01/31", "02/01", "02/02", "02/03", "02/04", "02/05", "02/06", "02/07", "02/08", "02/09", "02/10", "02/11", "02/12"], "prices": [9.53, 9.53, 8.73, 9.22, 8.77, 8.05, 8.62, 8.62, 8.62, 9.0, 9.39, 9.29, 9.29, 9.5, 9.5, 9.5, 9.26, 9.42, 10.2, 11.4, 11.21, 11.21, 11.21, 11.63, 11.66, 11.83, 12.55, 11.97, 11.97, 11.97, 11.12, 10.78, 10.21, 10.85, 14.94, 14.94, 14.94, 16.69, 16.51, 16.71, 16.71, 15.25, 15.25, 15.25, 15.7, 15.94, 16.23, 16.23, 17.88, 17.88, 17.88, 18.36, 18.82, 18.62, 19.63, 18.56, 18.56, 18.56, 19.2, 17.57, 19.76, 19.5, 21.58, 21.58, 21.58, 21.58, 21.19, 19.6, 20.61, 20.03, 20.03, 20.03, 18.42, 20.29, 22.81, 20.99, 18.99, 18.99, 18.99, 17.84, 19.61, 16.61, 14.79, 17.52, 17.52, 17.52, 19.45, 18.62, 17.04, 15.72], "ma20": [10.57, 10.41, 10.23, 10.09, 9.96, 9.76, 9.6, 9.43, 9.28, 9.21, 9.16, 9.15, 9.13, 9.13, 9.12, 9.11, 9.1, 9.1, 9.18, 9.27, 9.36, 9.44, 9.56, 9.68, 9.83, 10.02, 10.21, 10.38, 10.55, 10.7, 10.78, 10.86, 10.91, 10.97, 11.24, 11.52, 11.8, 12.16, 12.48, 12.74, 13.02, 13.22, 13.42, 13.6, 13.81, 14.01, 14.2, 14.41, 14.7, 15.0, 15.34, 15.72, 16.15, 16.54, 16.77, 16.95, 17.13, 17.23, 17.36, 17.4, 17.56, 17.77, 18.09, 18.4, 18.7, 18.98, 19.23, 19.39, 19.53, 19.64, 19.75, 19.83, 19.81, 19.89, 20.05, 20.17, 20.2, 20.22, 20.21, 20.22, 20.21, 20.07, 19.73, 19.53, 19.32, 19.12, 19.03, 18.98, 18.8, 18.59]}, "APLD": {"dates": ["11/15", "11/16", "11/17", "11/18", "11/19", "11/20", "11/21", "11/22", "11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29", "11/30", "12/01", "12/02", "12/03", "12/04", "12/05", "12/06", "12/07", "12/08", "12/09", "12/10", "12/11", "12/12", "12/13", "12/14", "12/15", "12/16", "12/17", "12/18", "12/19", "12/20", "12/21", "12/22", "12/23", "12/24", "12/25", "12/26", "12/27", "12/28", "12/29", "12/30", "12/31", "01/01", "01/02", "01/03", "01/04", "01/05", "01/06", "01/07", "01/08", "01/09", "01/10", "01/11", "01/12", "01/13", "01/14", "01/15", "01/16", "01/17", "01/18", "01/19", "01/20", "01/21", "01/22", "01/23", "01/24", "01/25", "01/26", "01/27", "01/28", "01/29", "01/30", "01/31", "02/01", "02/02", "02/03", "02/04", "02/05", "02/06", "02/07", "02/08", "02/09", "02/10", "02/11", "02/12"], "prices": [23.65, 23.65, 22.93, 22.84, 23.09, 21.37, 21.09, 21.09, 21.09, 23.79, 23.74, 24.94, 24.94, 27.1, 27.1, 27.1, 28.21, 28.05, 29.36, 31.14, 31.22, 31.22, 31.22, 32.11, 32.77, 30.99, 30.76, 27.86, 27.86, 27.86, 22.98, 24.24, 22.0, 23.9, 27.85, 27.85, 27.85, 27.78, 26.08, 25.72, 25.72, 24.05, 24.05, 24.05, 24.81, 24.08, 24.52, 24.52, 28.11, 28.11, 28.11, 30.2, 30.26, 29.56, 31.94, 37.68, 37.68, 37.68, 38.21, 36.71, 36.1, 35.22, 37.4, 37.4, 37.4, 37.4, 35.46, 35.06, 34.74, 37.69, 37.69, 37.69, 36.18, 41.35, 40.22, 38.07, 33.88, 33.88, 33.88, 34.8, 36.7, 31.54, 27.84, 34.95, 34.95, 34.95, 38.26, 37.47, 36.6, 36.17], "ma20": [30.94, 30.41, 29.84, 29.26, 28.72, 28.05, 27.37, 26.69, 26.11, 25.74, 25.27, 24.97, 24.67, 24.47, 24.28, 24.06, 24.04, 24.12, 24.44, 24.81, 25.19, 25.57, 25.99, 26.45, 26.93, 27.41, 27.9, 28.24, 28.57, 28.78, 28.74, 28.7, 28.56, 28.4, 28.43, 28.47, 28.45, 28.44, 28.28, 28.01, 27.73, 27.37, 27.01, 26.61, 26.21, 25.87, 25.56, 25.39, 25.4, 25.41, 25.67, 25.97, 26.38, 26.66, 26.87, 27.36, 27.85, 28.35, 28.95, 29.5, 30.02, 30.58, 31.25, 31.92, 32.54, 33.21, 33.76, 34.28, 34.62, 35.1, 35.57, 35.95, 36.24, 36.83, 37.25, 37.27, 37.08, 36.89, 36.67, 36.58, 36.61, 36.42, 35.94, 35.82, 35.7, 35.58, 35.72, 35.84, 35.93, 35.85]}, "AEHR": {"dates": ["02/12"], "prices": [27.89], "ma20": [null]}};
+
+
+// ── Chart.js lazy initialization ──
+const chartRegistry = {};
+const initializedTabs = {};
+
+function registerChart(tabId, canvasId, config) {
+  if (!chartRegistry[tabId]) chartRegistry[tabId] = [];
+  chartRegistry[tabId].push({ canvasId, config, instance: null });
+}
+
+function initChartsInTab(tabId) {
+  if (initializedTabs[tabId]) return;
+  const entries = chartRegistry[tabId] || [];
+  entries.forEach(entry => {
+    const canvas = document.getElementById(entry.canvasId);
+    if (!canvas) return;
+    entry.instance = new Chart(canvas.getContext('2d'), entry.config);
+  });
+  initializedTabs[tabId] = true;
+}
+
+// ── Tab switching ──
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  const btn = document.querySelector('.tab-btn[data-tab="' + tabId + '"]');
+  const content = document.getElementById('tab-' + tabId);
+  if (btn) btn.classList.add('active');
+  if (content) content.classList.add('active');
+  history.replaceState(null, '', '#' + tabId);
+  // Lazy init charts when tab is shown
+  setTimeout(() => initChartsInTab(tabId), 50);
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+
+// ── Register signal charts (lazy) ──
+const tickers = ["IONQ", "RKLB", "IREN", "PLTR", "SMCI", "COIN", "MSTR", "AFRM", "HOOD", "SOFI", "QBTS", "RGTI", "SMR", "SOUN", "RCAT", "ACHR", "BBAI", "ASTS", "FNGU", "NTLA", "PL", "LUNR", "APLD", "AEHR"];
+tickers.forEach(ticker => {
+  const d = chartData[ticker];
+  if (!d) return;
+  registerChart('signals', 'chart-' + ticker, {
+    type: 'line',
+    data: {
+      labels: d.dates,
+      datasets: [
+        {
+          label: 'Price',
+          data: d.prices,
+          borderColor: '#58a6ff',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          fill: false,
+          tension: 0.1,
+        },
+        {
+          label: 'MA20',
+          data: d.ma20,
+          borderColor: '#d29922',
+          borderWidth: 1,
+          pointRadius: 0,
+          borderDash: [4, 2],
+          fill: false,
+          tension: 0.1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#161b22',
+          borderColor: '#30363d',
+          borderWidth: 1,
+          titleColor: '#f0f6fc',
+          bodyColor: '#c9d1d9',
+          padding: 8,
+        },
+      },
+      scales: {
+        x: { display: false },
+        y: {
+          display: true,
+          grid: { color: '#21262d', drawBorder: false },
+          ticks: { color: '#484f58', font: { size: 9 }, maxTicksLimit: 3 },
+        },
+      },
+    },
+  });
+});
+
+// ── Register performance charts ──
+
+        registerChart('performance', 'perf-equity-chart', {
+          type: 'line',
+          data: {
+            datasets: [{
+              label: 'SIM (Paper)',
+              data: [["2026-02-10 22:28", 0.0], ["2026-02-10 22:40", -0.11], ["2026-02-10 23:20", 0.1]].map(d => ({x: d[0], y: d[1]})),
+              borderColor: '#3fb950',
+              borderWidth: 2,
+              pointRadius: 1,
+              fill: false,
+              tension: 0.2,
+            },],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+              legend: { display: true, labels: { color: '#8b949e', font: { size: 11 } } },
+              tooltip: {
+                backgroundColor: '#161b22',
+                borderColor: '#30363d',
+                borderWidth: 1,
+                titleColor: '#f0f6fc',
+                bodyColor: '#c9d1d9',
+                padding: 8,
+                callbacks: {
+                  label: function(ctx) { return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(2) + '%'; },
+                },
+              },
+            },
+            scales: {
+              x: {
+                type: 'category',
+                display: true,
+                grid: { display: false },
+                ticks: { color: '#484f58', font: { size: 8 }, maxTicksLimit: 8, maxRotation: 0 },
+              },
+              y: {
+                display: true,
+                grid: { color: '#21262d', drawBorder: false },
+                ticks: {
+                  color: '#484f58',
+                  font: { size: 9 },
+                  callback: function(v) { return v.toFixed(1) + '%'; },
+                },
+              },
+            },
+          },
+        });
+
+// ── Init on load ──
+document.addEventListener('DOMContentLoaded', function() {
+  const hash = window.location.hash.slice(1);
+  const validTabs = ['overview', 'portfolio', 'performance', 'signals'];
+  switchTab(validTabs.includes(hash) ? hash : 'overview');
+});
+</script>
+</body>
+</html>
